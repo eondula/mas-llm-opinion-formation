@@ -1,0 +1,4 @@
+Write one short argument supporting this selected position:
+{candidate}
+
+Use only the scenario and discussion above. Explain the tradeoff in your own words in one or two sentences. Do not introduce new facts or assumptions. Return only the argument, without repeating the position statement or adding a speaker label.

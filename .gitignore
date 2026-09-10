@@ -1,0 +1,77 @@
+# Python environments, caches and build products
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+*.egg-info/
+build/
+dist/
+
+# Local configuration, credentials and editor files
+.env
+.env.*
+!.env.example
+.DS_Store
+.vscode/
+.idea/
+*.log
+*.pid
+*.tmp
+
+# Generated runs and research artifacts (keep locally)
+results/
+outputs/
+/experiments/
+/mechanistic/
+/causal_patching/
+/component_patching/
+/sign_crossing/
+/plots/
+/report_figures/
+/report_figures_selected_10/
+/reports/
+/experiment A report/
+*.zip
+*.pt
+*.pth
+*.safetensors
+.cache/
+
+# Earlier implementation and historical documentation
+/src/
+/legacy/
+/legacy_2/
+/analysis/
+/docs/
+/PLAN.md
+/PILOT_IMPLEMENTATION.md
+/LICENSE
+
+# Stage only the current dashboard, prompts and scenario inputs
+/dashboard/app.js
+/dashboard/setup.js
+/dashboard/index.html
+/prompts/persona.txt
+/scenarios/legacy/
+/scenarios/scenarios.txt
+/scenarios/scenarios_test.txt
+
+# Keep current tests; exclude older test suites
+/tests/*
+!/tests/refactor/
+
+# LaTeX compilation intermediates
+*.aux
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
+*.out

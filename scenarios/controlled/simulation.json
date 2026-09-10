@@ -1,0 +1,32 @@
+{
+  "id": "simulation_tradeoff_001",
+  "title": "Simulation scale versus simulation detail",
+  "strategy_1": {
+    "name": "greater simulation detail",
+    "property_1": "fewer entities are simulated",
+    "property_2": "each entity is represented with more detail",
+    "candidate": "I support the strategy with fewer entities are simulated and each entity is represented with more detail.",
+    "arguments": [
+      "This strategy provides richer representations for the entities that are simulated.",
+      "This strategy concentrates simulation capacity on fewer, more detailed entities.",
+      "This strategy represents each selected entity in greater detail.",
+      "This strategy prioritizes entity detail over the total number of simulated entities.",
+      "This strategy provides more detailed representations for each selected entity.",
+      "This strategy simulates fewer entities so that each can be represented more precisely."
+    ]
+  },
+  "strategy_2": {
+    "name": "larger simulation",
+    "property_1": "more entities are simulated",
+    "property_2": "each entity is represented with less detail",
+    "candidate": "I support the strategy with more entities are simulated and each entity is represented with less detail.",
+    "arguments": [
+      "This strategy simulates a larger number of entities.",
+      "This strategy distributes simulation capacity across more entities.",
+      "This strategy increases the number of entities represented in the simulation.",
+      "This strategy prioritizes simulation scale over detail per entity.",
+      "This strategy uses less detail per entity so that more entities can be simulated.",
+      "This strategy broadens the simulation by reducing detail for each entity."
+    ]
+  }
+}

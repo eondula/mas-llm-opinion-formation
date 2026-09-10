@@ -1,0 +1,32 @@
+{
+  "id": "compute_tradeoff_001",
+  "title": "Experiment breadth versus model capacity",
+  "strategy_1": {
+    "name": "greater model capacity",
+    "property_1": "fewer experiments can be run",
+    "property_2": "each experiment uses a larger model",
+    "candidate": "I support the strategy with fewer experiments can be run and each experiment uses a larger model.",
+    "arguments": [
+      "This strategy allocates more model capacity to each experiment.",
+      "This strategy uses larger models for the experiments that are selected.",
+      "This strategy concentrates compute on fewer experiments.",
+      "This strategy prioritizes model capacity over the number of experiments.",
+      "This strategy provides more computational capacity for each individual experiment.",
+      "This strategy runs fewer experiments so that each can use a larger model."
+    ]
+  },
+  "strategy_2": {
+    "name": "broader experimentation",
+    "property_1": "more experiments can be run",
+    "property_2": "each experiment uses a smaller model",
+    "candidate": "I support the strategy with more experiments can be run and each experiment uses a smaller model.",
+    "arguments": [
+      "This strategy allows a larger number of experiments to be run.",
+      "This strategy distributes compute across more experiments.",
+      "This strategy increases the number of experimental configurations that can be tested.",
+      "This strategy prioritizes experimental breadth over model capacity.",
+      "This strategy uses smaller models so that more experiments can be evaluated.",
+      "This strategy explores more experimental settings with less capacity per experiment."
+    ]
+  }
+}

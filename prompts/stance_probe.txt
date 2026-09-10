@@ -1,0 +1,9 @@
+State your current position.
+
+Your response must be exactly one of the following:
+
+{candidate_2}
+{candidate_1}
+
+Do not change the wording.
+Do not provide any other text.

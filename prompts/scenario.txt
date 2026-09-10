@@ -1,0 +1,13 @@
+{title}.
+
+A research team must choose between two strategies.
+
+Option A:
+- {a1}
+- {a2}
+
+Option B:
+- {b1}
+- {b2}
+
+No other information should be considered.

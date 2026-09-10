@@ -1,0 +1,32 @@
+{
+  "id": "optimization_tradeoff_001",
+  "title": "Search breadth versus evaluation depth",
+  "strategy_1": {
+    "name": "deeper evaluation",
+    "property_1": "fewer candidate solutions are evaluated",
+    "property_2": "each candidate receives more detailed evaluation",
+    "candidate": "I support the strategy with fewer candidate solutions are evaluated and each candidate receives more detailed evaluation.",
+    "arguments": [
+      "This strategy provides more detailed evaluation for each selected candidate.",
+      "This strategy concentrates evaluation effort on fewer candidate solutions.",
+      "This strategy evaluates each selected candidate in greater detail.",
+      "This strategy prioritizes evaluation depth over the number of candidates considered.",
+      "This strategy provides deeper evaluation for the candidate solutions that are selected.",
+      "This strategy allocates more evaluation effort to each individual candidate."
+    ]
+  },
+  "strategy_2": {
+    "name": "broader search",
+    "property_1": "more candidate solutions are evaluated",
+    "property_2": "each candidate receives less detailed evaluation",
+    "candidate": "I support the strategy with more candidate solutions are evaluated and each candidate receives less detailed evaluation.",
+    "arguments": [
+      "This strategy evaluates a larger number of candidate solutions.",
+      "This strategy distributes evaluation effort across more candidates.",
+      "This strategy increases the number of candidate solutions included in the search.",
+      "This strategy explores a broader set of candidate solutions.",
+      "This strategy prioritizes search breadth over evaluation depth for each candidate.",
+      "This strategy uses less detailed evaluation per candidate so that more candidates can be considered."
+    ]
+  }
+}

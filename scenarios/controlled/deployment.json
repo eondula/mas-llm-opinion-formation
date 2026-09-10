@@ -1,0 +1,32 @@
+{
+  "id": "deployment_tradeoff_001",
+  "title": "Deployment frequency versus validation depth",
+  "strategy_1": {
+    "name": "deeper validation",
+    "property_1": "deployments occur less frequently",
+    "property_2": "each deployment receives more validation",
+    "candidate": "I support the strategy with deployments occur less frequently and each deployment receives more validation.",
+    "arguments": [
+      "This strategy performs more validation before each deployment.",
+      "This strategy concentrates validation effort on fewer deployments.",
+      "This strategy evaluates each deployment more thoroughly.",
+      "This strategy prioritizes validation depth over deployment frequency.",
+      "This strategy allocates more validation effort to every release.",
+      "This strategy deploys less frequently so that each deployment can receive more validation."
+    ]
+  },
+  "strategy_2": {
+    "name": "frequent deployment",
+    "property_1": "deployments occur more frequently",
+    "property_2": "each deployment receives less validation",
+    "candidate": "I support the strategy with deployments occur more frequently and each deployment receives less validation.",
+    "arguments": [
+      "This strategy deploys changes more frequently.",
+      "This strategy reduces the time between deployments.",
+      "This strategy increases the number of deployment events.",
+      "This strategy prioritizes deployment frequency over validation depth.",
+      "This strategy uses less validation per deployment so releases can occur more often.",
+      "This strategy accepts less validation per release to increase deployment frequency."
+    ]
+  }
+}

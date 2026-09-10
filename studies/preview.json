@@ -1,0 +1,1 @@
+{"mode":"preview","models":["Qwen/Qwen2.5-1.5B-Instruct"],"agents":2,"scenarios":["storage"],"rounds":20,"initialization":"natural","schedule":"synchronous","argument_mode":"predefined"}

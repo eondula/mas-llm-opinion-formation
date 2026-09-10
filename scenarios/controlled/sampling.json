@@ -1,0 +1,32 @@
+{
+  "id": "sampling_tradeoff_001",
+  "title": "Sampling frequency versus measurement duration",
+  "strategy_1": {
+    "name": "longer sampling duration",
+    "property_1": "samples are collected less frequently",
+    "property_2": "each sampling period lasts longer",
+    "candidate": "I support the strategy with samples are collected less frequently and each sampling period lasts longer.",
+    "arguments": [
+      "This strategy uses a longer duration for each sampling period.",
+      "This strategy allocates more time to each individual sampling period.",
+      "This strategy collects samples over longer intervals.",
+      "This strategy prioritizes sampling duration over sampling frequency.",
+      "This strategy concentrates sampling time into fewer, longer sampling periods.",
+      "This strategy provides longer measurement periods for each collected sample."
+    ]
+  },
+  "strategy_2": {
+    "name": "more frequent sampling",
+    "property_1": "samples are collected more frequently",
+    "property_2": "each sampling period is shorter",
+    "candidate": "I support the strategy with samples are collected more frequently and each sampling period is shorter.",
+    "arguments": [
+      "This strategy collects samples at more frequent intervals.",
+      "This strategy reduces the time between consecutive samples.",
+      "This strategy provides samples at more points in time.",
+      "This strategy uses shorter sampling periods to allow more frequent collection.",
+      "This strategy prioritizes sampling frequency over the duration of each sampling period.",
+      "This strategy increases temporal sampling frequency."
+    ]
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "mode": "study",
+  "models": [
+    "Qwen/Qwen2.5-1.5B-Instruct"
+  ],
+  "agents": 2,
+  "scenarios": [
+    "scenarios/study/sensor.json",
+    "scenarios/study/storage.json"
+  ],
+  "rounds": 20,
+  "grid": {
+    "initialization": [
+      "natural",
+      "all_forced"
+    ],
+    "schedule": [
+      "synchronous",
+      "sequential",
+      "reverse_sequential",
+      "no_peer"
+    ],
+    "argument_mode": [
+      "predefined",
+      "generated"
+    ],
+    "presentation_order": [
+      "strategy_1_first",
+      "strategy_2_first"
+    ]
+  },
+  "research": [
+    "validation",
+    "history",
+    "replay",
+    "sufficiency",
+    "prediction",
+    "mechanistic",
+    "heads",
+    "source_spans",
+    "continuation"
+  ],
+  "research_events_per_conversation": 1,
+  "agent_counts": [
+    2,
+    3
+  ],
+  "model_configurations": [
+    [
+      "Qwen/Qwen2.5-1.5B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-3B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-1.5B-Instruct",
+      "Qwen/Qwen2.5-3B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-3B-Instruct",
+      "Qwen/Qwen2.5-1.5B-Instruct"
+    ]
+  ],
+  "continuation_layer": -1
+}

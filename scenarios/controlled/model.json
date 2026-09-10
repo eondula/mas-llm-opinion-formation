@@ -1,0 +1,32 @@
+{
+  "id": "model_tradeoff_001",
+  "title": "Model simplicity versus flexibility",
+  "strategy_1": {
+    "name": "more flexible model",
+    "property_1": "the model has more parameters",
+    "property_2": "the model represents more complex patterns",
+    "candidate": "I support the strategy with the model has more parameters and the model represents more complex patterns.",
+    "arguments": [
+      "This strategy uses more parameters in the model.",
+      "This strategy allows the model to represent more complex patterns.",
+      "This strategy increases model capacity.",
+      "This strategy prioritizes representational flexibility over simplicity.",
+      "This strategy uses additional parameters to represent more complex relationships.",
+      "This strategy accepts greater model complexity in exchange for more flexibility."
+    ]
+  },
+  "strategy_2": {
+    "name": "simpler model",
+    "property_1": "the model has fewer parameters",
+    "property_2": "the model represents fewer complex patterns",
+    "candidate": "I support the strategy with the model has fewer parameters and the model represents fewer complex patterns.",
+    "arguments": [
+      "This strategy uses fewer parameters in the model.",
+      "This strategy reduces model complexity.",
+      "This strategy limits the complexity of patterns represented by the model.",
+      "This strategy prioritizes simplicity over representational flexibility.",
+      "This strategy uses a smaller parameter set.",
+      "This strategy accepts less representational complexity in exchange for a simpler model."
+    ]
+  }
+}

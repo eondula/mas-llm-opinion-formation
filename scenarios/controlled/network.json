@@ -1,0 +1,32 @@
+{
+  "id": "network_tradeoff_001",
+  "title": "Network coverage versus bandwidth",
+  "strategy_1": {
+    "name": "higher bandwidth",
+    "property_1": "fewer locations receive connectivity",
+    "property_2": "each connected location receives higher bandwidth",
+    "candidate": "I support the strategy with fewer locations receive connectivity and each connected location receives higher bandwidth.",
+    "arguments": [
+      "This strategy provides higher bandwidth to each connected location.",
+      "This strategy allocates more network capacity to each individual connection.",
+      "This strategy concentrates bandwidth among fewer connected locations.",
+      "This strategy prioritizes connection bandwidth over the number of connected locations.",
+      "This strategy provides greater bandwidth for each location that receives connectivity.",
+      "This strategy uses network capacity to support higher-bandwidth connections at fewer locations."
+    ]
+  },
+  "strategy_2": {
+    "name": "broader network coverage",
+    "property_1": "more locations receive connectivity",
+    "property_2": "each connected location receives lower bandwidth",
+    "candidate": "I support the strategy with more locations receive connectivity and each connected location receives lower bandwidth.",
+    "arguments": [
+      "This strategy provides connectivity to more locations.",
+      "This strategy distributes network capacity across more locations.",
+      "This strategy increases the number of connected locations.",
+      "This strategy prioritizes network coverage over bandwidth per location.",
+      "This strategy expands connectivity by allocating less bandwidth to each location.",
+      "This strategy accepts lower bandwidth per connection to reach more locations."
+    ]
+  }
+}

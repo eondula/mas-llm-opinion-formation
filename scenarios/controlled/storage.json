@@ -1,0 +1,42 @@
+{
+  "id": "storage_tradeoff_001",
+  "title": "Storage volume versus data fidelity",
+  "strategy_1": {
+    "name": "higher fidelity",
+    "property_1": "more storage space is required",
+    "property_2": "stored data has higher fidelity",
+    "candidate": "I support the strategy with more storage space is required and stored data has higher fidelity.",
+    "arguments": [
+      "This strategy preserves the stored data at higher fidelity.",
+      "This strategy allocates more storage space to preserve data fidelity.",
+      "This strategy retains more detail in the stored data.",
+      "This strategy prioritizes data fidelity over storage reduction.",
+      "This strategy uses additional storage to preserve more information.",
+      "This strategy accepts greater storage requirements to maintain higher fidelity."
+    ]
+  },
+  "strategy_2": {
+    "name": "reduced storage",
+    "property_1": "less storage space is required",
+    "property_2": "stored data has lower fidelity",
+    "candidate": "I support the strategy with less storage space is required and stored data has lower fidelity.",
+    "arguments": [
+      "This strategy requires less storage space.",
+      "This strategy reduces the amount of storage used by the data.",
+      "This strategy stores data using a smaller volume.",
+      "This strategy prioritizes storage reduction over data fidelity.",
+      "This strategy decreases storage requirements by preserving less detail.",
+      "This strategy accepts lower fidelity in exchange for reduced storage use."
+    ]
+  },
+  "persona_roles": {
+    "strategy_1": {
+      "role_name": "Data Fidelity Lead",
+      "priority": "Your role prioritizes preserving data fidelity over reducing storage use. This priority should inform your assessment throughout the discussion, but you may still maintain or revise your position based on the information available in the scenario and discussion."
+    },
+    "strategy_2": {
+      "role_name": "Storage Efficiency Lead",
+      "priority": "Your role prioritizes reducing storage requirements over preserving maximum data fidelity. This priority should inform your assessment throughout the discussion, but you may still maintain or revise your position based on the information available in the scenario and discussion."
+    }
+  }
+}
