@@ -15,6 +15,19 @@ class StudyTests(unittest.TestCase):
         items=list(configurations(c))
         self.assertEqual(len(items),5)
         self.assertEqual(items[-1]['initialization'],[2,2])
+    def test_paper_checkpoint_coverage(self):
+        from itertools import product, permutations
+        from llm_mas.config import ROOT
+        raw=json.loads((ROOT/'studies/paper.json').read_text())
+        items=list(configurations(resolve(raw)))
+        models={'Qwen/Qwen2.5-1.5B-Instruct','Qwen/Qwen2.5-3B-Instruct','HuggingFaceTB/SmolLM2-1.7B-Instruct'}
+        pairs={tuple(c['models']) for c in items if c['agents']==2}
+        triples={tuple(c['models']) for c in items if c['agents']==3}
+        self.assertEqual(pairs,set(product(models,repeat=2)))
+        self.assertEqual(triples,set(permutations(models)))
+        self.assertTrue(all(len(set(t))==3 for t in triples))
+        self.assertEqual(sum(len(c['scenarios']) for c in items if c['agents']==2),1440)
+        self.assertEqual(sum(len(c['scenarios']) for c in items if c['agents']==3),1728)
     def test_patch_cleanup(self):
         import torch
         from llm_mas.interventions import replacement

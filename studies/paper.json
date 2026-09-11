@@ -47,16 +47,68 @@
   ],
   "model_configurations": [
     [
+      "Qwen/Qwen2.5-1.5B-Instruct",
       "Qwen/Qwen2.5-1.5B-Instruct"
-    ],
-    [
-      "Qwen/Qwen2.5-3B-Instruct"
     ],
     [
       "Qwen/Qwen2.5-1.5B-Instruct",
       "Qwen/Qwen2.5-3B-Instruct"
     ],
     [
+      "Qwen/Qwen2.5-1.5B-Instruct",
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-3B-Instruct",
+      "Qwen/Qwen2.5-1.5B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-3B-Instruct",
+      "Qwen/Qwen2.5-3B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-3B-Instruct",
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+    ],
+    [
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+      "Qwen/Qwen2.5-1.5B-Instruct"
+    ],
+    [
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+      "Qwen/Qwen2.5-3B-Instruct"
+    ],
+    [
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-1.5B-Instruct",
+      "Qwen/Qwen2.5-3B-Instruct",
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-1.5B-Instruct",
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+      "Qwen/Qwen2.5-3B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-3B-Instruct",
+      "Qwen/Qwen2.5-1.5B-Instruct",
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-3B-Instruct",
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+      "Qwen/Qwen2.5-1.5B-Instruct"
+    ],
+    [
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+      "Qwen/Qwen2.5-1.5B-Instruct",
+      "Qwen/Qwen2.5-3B-Instruct"
+    ],
+    [
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct",
       "Qwen/Qwen2.5-3B-Instruct",
       "Qwen/Qwen2.5-1.5B-Instruct"
     ]

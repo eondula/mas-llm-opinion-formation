@@ -44,7 +44,7 @@ Run it with:
 python -m llm_mas study --config studies/paper.json --run-id paper_study
 ```
 
-The current terminal preset contains 1,216 main conversations: Sensor and Storage, 20 rounds, natural and all forced starts, four schedules, two argument modes and two presentation orders. Two-agent assignments include shared and mixed Qwen2.5-1.5B/3B checkpoints; three-agent assignments currently use shared checkpoints only. Research modules add measurements and intervened continuation runs. This can take substantial compute time; benchmark on your hardware before launching the preset.
+The current terminal preset contains 3,168 main conversations: Sensor and Storage, 20 rounds, natural and all forced starts, four schedules, two argument modes and two presentation orders. The checkpoints are Qwen2.5-1.5B-Instruct, Qwen2.5-3B-Instruct and HuggingFaceTB/SmolLM2-1.7B-Instruct. Two-agent runs include all nine ordered pairs (three shared and six mixed). Three-agent runs use all three different checkpoints, with all six assignments to Agent A/B/C to counterbalance position. This gives 1,440 two-agent and 1,728 three-agent conversations. Research modules add measurements and intervened continuation runs. This can take substantial compute time; benchmark on your hardware before launching the preset.
 
 The dashboard paper suite expands conditions for the selected agents and checkpoint assignment. It does not automatically apply the terminal preset's agent-count and checkpoint sweep.
 
