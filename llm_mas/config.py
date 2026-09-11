@@ -55,10 +55,16 @@ def resolve(raw):
     if c['mode'] not in ('preview', 'study'): raise ValueError('Invalid mode')
     if not isinstance(c['agents'], int) or c['agents'] < 2: raise ValueError('At least two agents required')
     if not isinstance(c['rounds'], int) or c['rounds'] < 1: raise ValueError('Rounds must be positive')
-    if c['mode'] == 'preview' and (c['agents'] != 2 or len(c['models']) != 1 or len(c['scenarios']) != 1):
-        raise ValueError('Preview requires two agents, one model and one scenario')
+    if c['mode'] == 'preview' and len(c['scenarios']) != 1:
+        raise ValueError('Preview requires one scenario')
     if len(c['models']) not in (1, c['agents']) or not all(isinstance(m, str) and m.strip() for m in c['models']):
         raise ValueError('Supply one model or one checkpoint per agent')
+    if c.get('agent_configuration') == 'homogeneous' and len(set(c['models'])) != 1:
+        raise ValueError('Homogeneous mode requires a shared checkpoint')
+    if c.get('agent_configuration') == 'heterogeneous' and (len(c['models']) != c['agents'] or len(set(c['models'])) != c['agents']):
+        raise ValueError('Heterogeneous mode requires a different checkpoint for each agent')
+    if c['mode']=='preview' and any(c.get(k) for k in ('grid','agent_counts','model_configurations')):
+        raise ValueError('Preview runs one conversation; sweeps require study mode')
     if c['schedule'] not in ('synchronous', 'sequential', 'reverse_sequential', 'no_peer'): raise ValueError('Invalid schedule')
     if c['argument_mode'] not in ('predefined', 'generated'): raise ValueError('Invalid argument mode')
     if c['presentation_order'] not in ('strategy_1_first', 'strategy_2_first'): raise ValueError('Invalid presentation order')

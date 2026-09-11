@@ -20,7 +20,7 @@ Model checkpoints and the sentiment classifier are downloaded on first use; subs
 python -m llm_mas preview --scenario storage --rounds 3 --run-id preview_check
 ```
 
-Preview runs two agents sharing one checkpoint on one scenario. Initialization is natural by default. Use `--initialization 2,1` for forced starts, `--argument-mode generated` for generated arguments, `--device cuda` to select CUDA, or `--no-sentiment` to omit sentiment. Round zero records initialization; `--rounds` specifies subsequent updates. Omit `--run-id` to use the system date and time. Existing IDs cannot be overwritten.
+Preview runs one scenario with two or more agents and shared or per-agent checkpoints. Use --agents 3 and --models followed by three checkpoint IDs for a mixed group. Initialization is natural by default. Use `--initialization 2,1` for forced starts, `--argument-mode generated` for generated arguments, `--device cuda` to select CUDA, or `--no-sentiment` to omit sentiment. Round zero records initialization; `--rounds` specifies subsequent updates. Omit `--run-id` to use the system date and time. Existing IDs cannot be overwritten.
 
 ## Dashboard
 

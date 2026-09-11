@@ -8,6 +8,9 @@ def main():
     sub=p.add_subparsers(dest='command',required=True)
     preview=sub.add_parser('preview')
     preview.add_argument('--model',default=DEFAULT_MODEL)
+    preview.add_argument('--agents',type=int,default=2)
+    preview.add_argument('--models',nargs='+',help='One checkpoint per agent; overrides --model')
+    preview.add_argument('--agent-configuration',choices=['homogeneous','heterogeneous'])
     preview.add_argument('--scenario',default='storage')
     preview.add_argument('--rounds',type=int,default=20)
     preview.add_argument('--argument-mode',choices=['predefined','generated'],default='predefined')
@@ -47,7 +50,7 @@ def main():
     if args.command=='resume': raw=json.loads((run_path(args.run_id)/'config.json').read_text())
     elif args.command=='study':raw=json.loads(Path(args.config).read_text());raw.setdefault('mode','study')
     else:
-        raw=dict(models=[args.model],scenarios=[args.scenario],rounds=args.rounds,argument_mode=args.argument_mode,
+        raw=dict(models=args.models or [args.model],agents=args.agents,agent_configuration=args.agent_configuration,scenarios=[args.scenario],rounds=args.rounds,argument_mode=args.argument_mode,
                  initialization='natural' if args.initialization=='natural' else [int(x) for x in args.initialization.split(',')],
                  schedule=args.schedule,device=args.device,sentiment=not args.no_sentiment)
     config=resolve(raw)

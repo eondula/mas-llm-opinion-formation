@@ -48,7 +48,7 @@ class EngineTests(unittest.TestCase):
         rows=conversation(c,c['scenarios'][0],templates(),{c['models'][0]:Fake()})
         self.assertEqual(rows[0]['argument'],'Generated support.')
     def test_invalid_preview(self):
-        with self.assertRaises(ValueError):resolve({'agents':3})
+        with self.assertRaises(ValueError):resolve({'scenarios':['sensor','storage']})
     def test_figures(self):
         import json
         from llm_mas.figures import render
