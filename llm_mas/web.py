@@ -17,7 +17,7 @@ from .runner import write
 def display_event(event):
     """Send only fields used by dashboard playback; raw results stay on disk."""
     row=event['row']
-    small={k:row[k] for k in ('round','agent','model','strategy','forced','message','argument','sentiment','deliveries') if k in row}
+    small={k:row[k] for k in ('round','agent','model','strategy','forced','message','argument','sentiment','deliveries','choice_status') if k in row}
     small['post']={'stance':row.get('post',{}).get('stance')}
     return dict(task=event['task'],row=small)
 
@@ -97,7 +97,9 @@ def serve(port=8766):
                     events=[]
                     if p and (p/'events.jsonl').exists():
                         for line in (p/'events.jsonl').read_text().splitlines():
-                            try: events.append(display_event(json.loads(line)))
+                            try:
+                                event = json.loads(line)
+                                if "row" in event: events.append(display_event(event))
                             except json.JSONDecodeError:pass
                     proc=state['process'] if name==state['run_id'] else None
                     if p and (p/'conversations').exists():

@@ -12,6 +12,10 @@ def render(path):
         from .experiment_c import export
         return export(path)
 
+    if (path/'config.json').exists() and json.loads((path/'config.json').read_text()).get('export_profile') == 'full_behavioral':
+        from .full_study_analysis import export
+        return export(path)
+
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt

@@ -12,6 +12,7 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
     histories = [initial(scenario, texts, config['presentation_order'], n, persona=i%2+1 if config.get('persona') else None) for i, _ in enumerate(names)]
     counts = [{1:0,2:0} for _ in names]
     messages, rows = [None]*n, []
+    similarity = None
     for t in range(config['rounds']+1):
         old = list(messages)
         order = list(range(n))
@@ -37,10 +38,23 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
                 strategy = 1 if decision['margin'] >= 0 else 2
             decision_history = deepcopy(histories[i])
             selected = scenario[f'strategy_{strategy}']
+            choice_status = 'forced' if forced else 'scored'
+            generation_options = {}
+            if config.get('decoding') == 'fixed_sampling':
+                sampling = dict(config['sampling'])
+                sampling['seed'] += t*n+i
+                generation_options['sampling'] = sampling
             generation = None
             argument_selection = None
             argument_index = None
-            if config['argument_mode'] in ('generated', 'conversational'):
+            autonomous = config.get('decision_mode') == 'generated' and not forced
+            if autonomous:
+                from .choice_output import parse, instruction
+                prompt = instruction(texts, scenario)
+                generation = runtime.generate(histories[i]+[{'role':'user','content':prompt}], config['max_argument_tokens'], **generation_options)
+                generation = dict(generation, instruction=prompt)
+                strategy, argument, choice_status = parse(generation['output'])
+            elif config['argument_mode'] in ('generated', 'conversational'):
                 prompt = texts['generate_argument'].format(candidate=selected['candidate'])
                 if config['argument_mode'] == 'conversational':
                     reply_instruction = (
@@ -48,13 +62,13 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
                         if deliveries else
                         'No peer message has been delivered. Give your own rationale for the selected position; do not imply that another agent has spoken.')
                     prompt = texts['conversational_argument'].format(candidate=selected['candidate'], reply_instruction=reply_instruction)
-                generation = runtime.generate(histories[i] + [{'role':'user','content':prompt}], config['max_argument_tokens'])
+                generation = runtime.generate(histories[i] + [{'role':'user','content':prompt}], config['max_argument_tokens'], **generation_options)
                 generation = dict(generation, instruction=prompt, argument_mode=config['argument_mode'])
                 argument = generation['output']
             elif config['argument_mode'] == 'combined_reasoning':
                 prompt = texts['stance_probe'].format(candidate_1=scenario['strategy_1']['candidate'], candidate_2=scenario['strategy_2']['candidate'])
                 prefix = selected['candidate'] + '\n'
-                generation = runtime.generate(histories[i] + [{'role':'user','content':prompt}], config['max_argument_tokens'], continuation_prefix=prefix)
+                generation = runtime.generate(histories[i] + [{'role':'user','content':prompt}], config['max_argument_tokens'], continuation_prefix=prefix, **generation_options)
                 generation = dict(generation, instruction=prompt, continuation_prefix=prefix, argument_mode='combined_reasoning')
                 argument = generation['output']
             elif config['argument_mode'] == 'combined_fixed':
@@ -69,13 +83,54 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
                 argument_index = counts[i][strategy] % len(selected['arguments'])
                 argument = selected['arguments'][argument_index]
                 counts[i][strategy] += 1
-            message = selected['candidate']+'\n'+argument
+            message = generation['output'] if autonomous else selected['candidate']+'\n'+argument
             messages[i] = message
             histories[i].append({'role':'assistant','content':message})
             post = runtime.measure(histories[i], scenario, texts)
             row = dict(round=t, agent=names[i], model=models[i], strategy=strategy, forced=forced,
-                       before=before, decision=decision, post=post, message=message, argument=argument,
+                       before=before, decision=decision, post=post, message=message, argument=argument, choice_status=choice_status,
                        generation=generation, argument_index=argument_index, argument_selection=argument_selection, deliveries=deliveries, decision_history=decision_history, history=deepcopy(histories[i]))
             rows.append(row)
             emit(kind='response', row=row, completed=len(rows), total=(config['rounds']+1)*n)
+        if config.get('stopping') in ('exact_repetition', 'cosine_similarity', 'combined_stability', 'sign_stability') and t >= 1:
+            details = {}
+            if config['stopping'] == 'cosine_similarity' and t < config.get('minimum_rounds', 2):
+                matched = []
+            elif config['stopping'] in ('cosine_similarity', 'combined_stability', 'sign_stability'):
+                if similarity is None:
+                    from .message_similarity import MessageSimilarity
+                    similarity = MessageSimilarity()
+                scores = similarity.compare(messages, old)
+                threshold = config.get('similarity_threshold', 0.8)
+                matched = [name for name, score in zip(names, scores) if score >= threshold]
+                details = dict(similarities=dict(zip(names, scores)), threshold=threshold,
+                               encoder=similarity.encoder, encoder_revision=similarity.revision,
+                               input='complete_public_message', pooling='length-weighted chunk mean, L2 normalized')
+            else:
+                matched = [name for i, name in enumerate(names) if messages[i] == old[i]]
+            if config['stopping'] in ('combined_stability', 'sign_stability'):
+                previous = {r['agent']:r for r in rows[-2*n:-n]}
+                current = {r['agent']:r for r in rows[-n:]}
+                deltas = {name:abs(current[name]['post']['margin']-previous[name]['post']['margin']) for name in names}
+                unchanged = {name:current[name]['strategy'] is not None and previous[name]['strategy'] is not None and current[name]['strategy']==previous[name]['strategy'] for name in names}
+                details.update(margin_changes=deltas, strategy_unchanged=unchanged)
+                if config['stopping'] == 'sign_stability':
+                    signs = {name:(current[name]['post']['margin'] >= 0) == (previous[name]['post']['margin'] >= 0) for name in names}
+                    matched = [name for name in matched if unchanged[name] and signs[name]]
+                    details.update(margin_sign_unchanged=signs, zero_convention='nonnegative_favors_strategy_1')
+                else:
+                    tolerance = config.get('margin_tolerance', 0.1)
+                    matched = [name for name in matched if unchanged[name] and deltas[name] <= tolerance]
+                    details.update(margin_tolerance=tolerance)
+            minimum = config.get('minimum_rounds', 2) if config['stopping'] == 'cosine_similarity' else 1
+            reason = (('system_detected_stability' if config['stopping'] in ('combined_stability', 'sign_stability') else 'system_detected_repetition') if t >= minimum and len(matched) == n
+                      else 'max_rounds' if t == config['rounds'] else None)
+            termination = dict(round=t, previous_round=t-1, matched_agents=matched,
+                               reason=reason, policy=config['stopping'], **details)
+            for row in rows[-n:]:
+                row['termination'] = termination
+            emit(kind='termination_check', **termination,
+                 completed=len(rows), total=(config['rounds']+1)*n)
+            if reason and not config.get('observe_stopping', False):
+                break
     return rows

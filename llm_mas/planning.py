@@ -7,7 +7,7 @@ def conditions(config):
     if explicit: return explicit
     grid = config.get('grid', {})
     if not grid: return [{}]
-    allowed={'schedule','argument_mode','presentation_order','initialization','persona'}
+    allowed={'schedule','argument_mode','presentation_order','initialization','persona','decision_mode','stopping','observe_stopping'}
     if set(grid)-allowed: raise ValueError('Unknown grid factor')
     keys=list(grid)
     if any(not isinstance(grid[k],list) or not grid[k] for k in keys):raise ValueError('Grid factors require nonempty lists')

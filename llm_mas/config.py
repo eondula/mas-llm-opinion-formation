@@ -1,3 +1,4 @@
+import math
 import hashlib
 import json
 import re
@@ -38,6 +39,8 @@ def validate_scenario(data):
         raise ValueError('Candidate statements must differ')
 
 def resolve(raw):
+    if raw.get('mode') == 'no_fixed_rounds':
+        raw = dict(raw, mode='preview', stopping='sign_stability')
     if raw.get('preview_preset'):
         if raw['preview_preset'] not in ('persona', 'no_persona'):
             raise ValueError('Unknown quick preview preset')
@@ -56,6 +59,34 @@ def resolve(raw):
              initialization='natural', schedule='synchronous', argument_mode='predefined',
              max_argument_tokens=128, sentiment=True, device='auto', presentation_order='strategy_1_first')
     c.update(raw)
+    c['decoding'] = c.get('decoding', 'greedy')
+    if c['decoding'] not in ('greedy', 'fixed_sampling'):
+        raise ValueError('Unknown decoding mode')
+    if c['decoding'] == 'fixed_sampling':
+        if c['argument_mode'] not in ('generated', 'conversational', 'combined_reasoning'):
+            raise ValueError('Sampling requires generated explanations; choose Combined prompt (flexible reasoning) or another generated mode')
+        method = c.get('sampling_method', 'combined')
+        if method not in ('temperature', 'top_p', 'combined'):
+            raise ValueError('Unknown sampling method')
+        supplied = c.get('sampling') or {}
+        if not isinstance(supplied, dict):
+            raise ValueError('Sampling settings must be an object')
+        settings = dict(temperature=0.7, top_p=0.9, seed=42)
+        settings.update({k:supplied[k] for k in settings if k in supplied})
+        if method == 'temperature':settings['top_p']=1.0
+        if method == 'top_p':settings['temperature']=1.0
+        for key in ('temperature','top_p'):
+            value=settings[key]
+            if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<=0:
+                raise ValueError(f'{key} must be a finite positive number')
+        if settings['top_p']>1:raise ValueError('top_p must be at most 1')
+        if type(settings['seed']) is not int or not 0<=settings['seed']<=2**32-1:
+            raise ValueError('Seed must be an integer from 0 to 4294967295')
+        settings['top_k']=0
+        c['sampling_method']=method
+        c['sampling']=settings
+    else:
+        c.pop('sampling', None)
     c['conditions'] = c.get('conditions') or []
     if c.pop('paper_suite', False):
         paper=json.loads((ROOT/'studies/paper.json').read_text())
@@ -69,6 +100,35 @@ def resolve(raw):
             candidate=ROOT/'scenarios/study'/f'{name}.json'
             enriched.append(str(candidate) if name in ('sensor','storage') and candidate.exists() else value)
         c['scenarios']=enriched
+    if c.get('stopping', 'fixed') not in ('fixed', 'exact_repetition', 'cosine_similarity', 'combined_stability', 'sign_stability'):
+        raise ValueError('Invalid stopping policy')
+    if c.get('stopping') in ('exact_repetition', 'cosine_similarity', 'combined_stability', 'sign_stability') and c.get('export_profile') in ('experiment_c', 'experiment_d'):
+        raise ValueError('Adaptive stopping requires the generic figure exporter')
+    if c.get('stopping') == 'sign_stability':
+        c.pop('minimum_rounds', None)
+        c.pop('margin_tolerance', None)
+        c.setdefault('similarity_threshold', 0.8)
+        threshold = c['similarity_threshold']
+        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not math.isfinite(threshold) or not -1 <= threshold <= 1:
+            raise ValueError('Similarity threshold must be between -1 and 1')
+    if c.get('stopping') == 'combined_stability':
+        c.pop('minimum_rounds', None)
+        c.setdefault('margin_tolerance', 0.1)
+        tolerance = c['margin_tolerance']
+        if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or not math.isfinite(tolerance) or tolerance < 0:
+            raise ValueError('Margin tolerance must be finite and nonnegative')
+        c.setdefault('similarity_threshold', 0.8)
+        threshold = c['similarity_threshold']
+        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not math.isfinite(threshold) or not -1 <= threshold <= 1:
+            raise ValueError('Similarity threshold must be between -1 and 1')
+    if c.get('stopping') == 'cosine_similarity':
+        c.setdefault('minimum_rounds', 2)
+        if type(c['minimum_rounds']) is not int or c['minimum_rounds'] < 1:
+            raise ValueError('Minimum rounds must be a positive integer')
+        c.setdefault('similarity_threshold', 0.8)
+        threshold = c['similarity_threshold']
+        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not math.isfinite(threshold) or not -1 <= threshold <= 1:
+            raise ValueError('Similarity threshold must be between -1 and 1')
     if c['mode'] not in ('preview', 'study'): raise ValueError('Invalid mode')
     if not isinstance(c['agents'], int) or c['agents'] < 2: raise ValueError('At least two agents required')
     if not isinstance(c['rounds'], int) or c['rounds'] < 1: raise ValueError('Rounds must be positive')
@@ -87,6 +147,12 @@ def resolve(raw):
     if c['presentation_order'] not in ('strategy_1_first', 'strategy_2_first'): raise ValueError('Invalid presentation order')
     if c['device'] not in ('auto', 'cpu', 'cuda', 'mps'): raise ValueError('Invalid device')
     if not isinstance(c['max_argument_tokens'], int) or not 1 <= c['max_argument_tokens'] <= 2048: raise ValueError('Invalid token limit')
+    if c.get('decision_mode', 'scored') not in ('scored','generated'):
+        raise ValueError('Invalid decision mode')
+    if c.get('decision_mode') == 'generated' and c['argument_mode'] != 'combined_reasoning':
+        raise ValueError('Generated choice requires combined reasoning')
+    if type(c.get('observe_stopping',False)) is not bool:
+        raise ValueError('observe_stopping must be boolean')
     start = c['initialization']
     if start != 'natural' and (not isinstance(start, list) or len(start) != c['agents'] or any(x not in (1,2) for x in start)):
         raise ValueError('Initialization must be natural or a list of 1/2, one per agent')
@@ -96,7 +162,7 @@ def resolve(raw):
     if set(c.get('research', [])) - {'validation', 'history', 'replay', 'prediction', 'mechanistic', 'heads', 'source_spans', 'continuation', 'sufficiency'}: raise ValueError('Unknown research module')
     if c['mode'] == 'preview' and (c.get('conditions') or c.get('research')): raise ValueError('Preview runs one conversation; conditions and research require study mode')
     for condition in c.get('conditions', []):
-        if set(condition) - {'initialization','schedule','argument_mode','presentation_order','persona'}: raise ValueError('Invalid condition fields')
+        if set(condition) - {'initialization','schedule','argument_mode','presentation_order','persona','decision_mode','stopping','observe_stopping'}: raise ValueError('Invalid condition fields')
         resolve(dict(c, **condition, conditions=[]))
     if not isinstance(c.get('persona', False), bool):
         raise ValueError('Persona must be true or false')

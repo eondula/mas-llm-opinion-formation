@@ -1,6 +1,17 @@
 import math
 import weakref
 
+def select_device(torch, requested):
+    cuda = torch.cuda.is_available()
+    mps = hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
+    if requested == 'auto':
+        return 'cuda' if cuda else 'mps' if mps else 'cpu'
+    if requested not in ('cpu', 'cuda', 'mps'):
+        raise ValueError('Unknown device: '+requested)
+    if (requested == 'cuda' and not cuda) or (requested == 'mps' and not mps):
+        raise ValueError(f'{requested.upper()} is unavailable. Use --device auto or select an available device.')
+    return requested
+
 class Runtime:
     instances=weakref.WeakSet()
     def __init__(self, name, device='auto'):
@@ -9,7 +20,7 @@ class Runtime:
         print(f'Loading {name}: importing Transformers', flush=True)
         from transformers import AutoTokenizer, AutoModelForCausalLM
         self.torch = torch
-        self.device = device if device != 'auto' else ('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
+        self.device = select_device(torch, device)
         print(f'Loading {name}: tokenizer', flush=True)
         self.tokenizer = AutoTokenizer.from_pretrained(name)
         print(f'Loading {name}: model weights', flush=True)
@@ -62,14 +73,18 @@ class Runtime:
                     token_counts=[len(t1),len(t2)], normalized_margin=l1/len(t1)-l2/len(t2) if t1 and t2 else None,
                     rendered_prompt=rendered, probe=probe)
 
-    def generate(self, messages, max_tokens, continuation_prefix=''):
+    def generate(self, messages, max_tokens, continuation_prefix='', sampling=None):
         rendered, inputs = self.inputs(messages, continuation_prefix)
+        options = dict(do_sample=bool(sampling), num_beams=1)
+        if sampling:
+            self.torch.manual_seed(sampling['seed'])
+            options.update({k:sampling[k] for k in ('temperature','top_p','top_k')})
         with self.torch.inference_mode():
-            output = self.model.generate(**inputs, max_new_tokens=max_tokens, do_sample=False, num_beams=1,
+            output = self.model.generate(**inputs, max_new_tokens=max_tokens, **options,
                                          pad_token_id=self.tokenizer.eos_token_id)
         text = self.tokenizer.decode(output[0][inputs.input_ids.shape[1]:], skip_special_tokens=True).strip()
         if not text: raise ValueError('Empty generated argument')
-        return dict(output=text, rendered_prompt=rendered + continuation_prefix, continuation_prefix=continuation_prefix, max_new_tokens=max_tokens, do_sample=False, num_beams=1)
+        return dict(output=text, generated_tokens=int(output.shape[1]-inputs.input_ids.shape[1]), rendered_prompt=rendered + continuation_prefix, continuation_prefix=continuation_prefix, max_new_tokens=max_tokens, **options, **({'seed':sampling['seed']} if sampling else {}))
 
     def select_argument(self, history, selected, texts):
         """Constrained deterministic choice among numbered argument entries."""

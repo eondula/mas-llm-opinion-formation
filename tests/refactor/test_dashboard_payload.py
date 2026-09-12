@@ -13,3 +13,9 @@ class PayloadTests(unittest.TestCase):
         self.assertNotIn('history',compact['row'])
         self.assertNotIn('decision',compact['row'])
         self.assertIn('history',row)
+
+    def test_legacy_stopping_badges_are_not_exposed(self):
+        row=dict(round=1,agent='Agent B',post={},termination={'decisions':[
+            {'agent':'Agent B','action':'CONTINUE','valid':False}]})
+        compact=display_event(dict(task='000',row=row))
+        self.assertNotIn('stopping',compact['row'])

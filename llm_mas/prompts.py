@@ -26,4 +26,7 @@ def for_condition(texts, config, scenario):
     for k in (1, 2):
         pool = '\n'.join('- '+a for a in scenario[f'strategy_{k}']['arguments'])
         template = template.replace('{arguments_'+str(k)+'}', pool.replace('{','{{').replace('}','}}'))
+    if config.get('reverse_candidate_blocks'):
+        a=template.index('STRATEGY 1\n'); b=template.index('STRATEGY 2\n'); end=template.index('Return the exact candidate statement')
+        template=template[:a]+template[b:end].rstrip()+'\n\n'+template[a:b].rstrip()+'\n\n'+template[end:]
     return dict(texts, stance_probe=template)

@@ -363,3 +363,23 @@ All figures and tables are included in `paper_outputs.zip`.
 
 This differs from Experiment C v2 in prompt wording and duration as well as the
 added persona factor. Use within-D matched conditions for persona comparisons.
+
+### Quick preview explanation decoding
+
+Quick preview offers Greedy or Sampling. Sampling exposes Temperature only,
+Top-p only, or both controls, plus an editable base seed (default 42). Temperature
+only fixes top-p at 1; Top-p only fixes temperature at 1. Top-k is disabled in all
+sampling modes. The default input values are temperature 0.7 and top-p 0.9.
+Each generated response uses `base_seed + round * agents + agent_index`.
+Effective parameters are validated and saved in the configuration and generation
+records. Reproducibility depends on hardware, checkpoint and software versions.
+In scored-choice mode, sampling affects explanations while choices use candidate
+likelihoods. Generated-choice mode samples the structured choice and explanation.
+Use a generated argument mode; fixed-list modes reject sampling. Study runs in
+the dashboard keep greedy decoding. Existing runs are unaffected by UI changes.
+
+### Full behavioral study
+
+See [the full experiment run guide](docs/full_experiment_run.md) for the smoke test,
+full runs, separate controls and analysis commands. Presets select CUDA/MPS/CPU
+automatically. Full runs use a maximum of 15 update rounds.

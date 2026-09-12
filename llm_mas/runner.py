@@ -45,9 +45,10 @@ def execute(raw, name=None, resume=False):
     from .progress import Progress
     tracker=Progress()
     phase_counts={}
+    termination_status = {}
     def status(phase, **extra):
         metrics=tracker.update(phase,extra.pop('phase_completed',done if phase=='conversation' else None),extra.pop('phase_total',total if phase=='conversation' else None))
-        write(path/'status.json', dict(metrics, completed=done,total=total,**extra))
+        write(path/'status.json', dict(metrics, completed=done,total=total,termination=termination_status or None,**extra))
     def research_progress(module,model,scenario):
         phase_counts[module]=phase_counts.get(module,0)+1
         if module in ('validation','history'):
@@ -63,7 +64,11 @@ def execute(raw, name=None, resume=False):
             for si, scenario in enumerate(active['scenarios']):
                 target = path/'conversations'/f'{ti:03d}_{si:03d}.json'
                 if target.exists():
-                    done += (active['rounds']+1)*active['agents']
+                    saved = json.loads(target.read_text())
+                    termination_status = saved.get('termination') or {}
+                    count = len(saved['rows'])
+                    done += count
+                    total -= (active['rounds']+1)*active['agents'] - count
                     continue
                 for name_ in set(active['models']):
                     if name_ not in runtimes:
@@ -75,11 +80,17 @@ def execute(raw, name=None, resume=False):
                     done = base+event['completed']
                     with (path/'events.jsonl').open('a') as out:
                         out.write(json.dumps(dict(task=target.stem, **event))+'\n')
-                    status('conversation', task=target.stem)
+                    status('stopping_check' if event.get('kind') == 'termination_check' else 'conversation', task=target.stem)
                     elapsed = time.monotonic()-start
                     print(f'[{"="*int(30*done/total):30}] {done}/{total} elapsed {elapsed:.0f}s ETA {elapsed*(total-done)/done:.0f}s', flush=True)
                 rows = conversation(active, scenario, texts, runtimes, emit)
-                write(target, dict(config=active, scenario=scenario, rows=rows))
+                total -= (active['rounds']+1)*active['agents'] - len(rows)
+                termination = rows[-1].get('termination')
+                if active.get('observe_stopping'):
+                    triggers = [r['round'] for r in rows if (r.get('termination') or {}).get('reason') == 'system_detected_stability']
+                    termination = dict(reason='fixed_horizon', round=rows[-1]['round'], first_proposed_stop=min(triggers) if triggers else None)
+                termination_status = termination or {}
+                write(target, dict(config=active, scenario=scenario, rows=rows, termination=termination))
         if config.get('research'):
             from .research import run as run_research
             for model_name in {m for task in tasks for m in task['models']}:
@@ -103,6 +114,28 @@ def execute(raw, name=None, resume=False):
                     sentiment_done+=1
                     status('sentiment',phase_completed=sentiment_done,phase_total=sentiment_total)
                 write(target, record)
+        if config.get('export_profile') == 'full_behavioral':
+            status('explanation_similarity')
+            from .message_similarity import MessageSimilarity
+            encoder = None
+            for target in sorted((path/'conversations').glob('*.json')):
+                record = json.loads(target.read_text())
+                previous = {}
+                for row in record['rows']:
+                    history = previous.setdefault(row['agent'], [])
+                    text = row['argument'] if row.get('choice_status') not in ('invalid_json','invalid_schema') else ''
+                    if 'explanation_similarity' not in row:
+                        value = adjacent = None
+                        if text and history:
+                            if encoder is None: encoder = MessageSimilarity()
+                            scores = encoder.compare([text]*len(history),history)
+                            value=max(scores);adjacent=scores[-1]
+                        row['explanation_similarity'] = value
+                        row['adjacent_explanation_similarity'] = adjacent
+                    if text: history.append(text)
+                write(target, record)
+            del encoder
+            gc.collect()
         if 'prediction' in config.get('research', []):
             from .prediction import run as predict, predict_groups
             status('prediction')

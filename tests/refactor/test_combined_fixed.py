@@ -52,6 +52,7 @@ class CombinedTests(unittest.TestCase):
             def input_ids(self):return self['input_ids']
         r.inputs=lambda messages,candidate:('P',Inputs(input_ids=torch.tensor([[ord(c) for c in 'P'+candidate]])))
         r.model=lambda **kw:SimpleNamespace(logits=torch.zeros(1,kw['input_ids'].shape[1],128))
+        r.model.config=SimpleNamespace()
         score,values,rendered=r.likelihood([], 'abc',continuation_prefix='candidate\n')
         self.assertEqual(len(values),3)
         self.assertAlmostEqual(score,-3*math.log(128),places=5)

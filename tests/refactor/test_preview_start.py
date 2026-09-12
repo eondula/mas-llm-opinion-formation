@@ -47,7 +47,7 @@ class PreviewStartTests(unittest.TestCase):
         function = script.split('function config(){', 1)[1].split('\nasync function load', 1)[0]
         javascript = '''
 const assert=require('node:assert/strict');
-const fields={'agent-configuration':{value:'homogeneous'},mode:{value:'preview'},'paper-suite':{checked:true},'run-id':{value:''},
+const fields={'decision-mode':{value:'scored'},'sampling-method':{value:'combined'},temperature:{value:'0.7'},'top-p':{value:'0.9'},'sampling-seed':{value:'42'},decoding:{value:'greedy'},'preview-preset':{value:'no_persona'},'agent-configuration':{value:'homogeneous'},mode:{value:'preview'},'paper-suite':{checked:true},'run-id':{value:''},
 agents:{value:'2'},models:{value:'Qwen/Qwen2.5-1.5B-Instruct'},
 scenarios:{selectedOptions:[{value:'storage'}]},rounds:{value:'1'},
 initialization:{value:'natural'},schedule:{value:'synchronous'},

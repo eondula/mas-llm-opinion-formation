@@ -19,7 +19,9 @@ def main():
     preview.add_argument('--device',default='auto',choices=['auto','cpu','cuda','mps'])
     preview.add_argument('--no-sentiment',action='store_true')
     for parser in (preview,sub.add_parser('study')):
-        if parser != preview: parser.add_argument('--config',required=True,help='JSON configuration')
+        if parser != preview:
+            parser.add_argument('--config',required=True,help='JSON configuration')
+            parser.add_argument('--device',choices=['auto','cpu','cuda','mps'],help='Override configuration device')
         parser.add_argument('--run-id')
         parser.add_argument('--dry-run',action='store_true')
     analyze=sub.add_parser('analyze');analyze.add_argument('--config',required=True);analyze.add_argument('--run-id',required=True)
@@ -68,6 +70,8 @@ def main():
         raw=dict(models=args.models or [args.model],agents=args.agents,agent_configuration=args.agent_configuration,scenarios=[args.scenario],rounds=args.rounds,argument_mode=args.argument_mode,
                  initialization='natural' if args.initialization=='natural' else [int(x) for x in args.initialization.split(',')],
                  schedule=args.schedule,device=args.device,sentiment=not args.no_sentiment)
+    if args.command == 'study' and args.device is not None:
+        raw['device'] = args.device
     config=resolve(raw)
     if getattr(args,'dry_run',False):
         from .prompts import templates,initial

@@ -62,3 +62,8 @@ main{padding:30px 36px}.context{padding:5px 0 22px}.context h2{font-size:32px;fo
 /* Plot series are independent of blue/magenta strategy colors. */
 :root{--plot-1:#c65b00;--plot-2:#16803c;--plot-3:#925000;--plot-4:#46750c}
 :root[data-theme=dark]{--plot-1:#ff9a32;--plot-2:#39ff88;--plot-3:#ffd166;--plot-4:#bbff45}
+
+
+@keyframes response-pop { from { opacity:0; transform:translateY(10px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
+.bubble.response-pop { animation:response-pop 220ms ease-out; }
+@media (prefers-reduced-motion:reduce) { .bubble.response-pop { animation:none; } }
