@@ -1,5 +1,6 @@
 """Local dashboard using the same CLI/configuration as terminal runs."""
 import json
+import shlex
 import signal
 import subprocess
 import sys
@@ -11,6 +12,28 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from .config import ROOT, resolve, run_path, scenario, validate_scenario, resolve_run_id
 from .runner import write
+
+
+def active_runs():
+    """Discover running CLI studies, including ones started before the server."""
+    try:
+        output=subprocess.check_output(['ps','-ax','-o','command='],text=True)
+    except (OSError,subprocess.SubprocessError):
+        return []
+    names=set()
+    for line in output.splitlines():
+        try:
+            args=shlex.split(line)
+            i=args.index('-m')
+            if args[i+1:i+3] != ['llm_mas','study']:continue
+            name=args[args.index('--run-id')+1]
+            path=run_path(name)
+            if not (path/'config.json').exists():continue
+            status=json.loads((path/'status.json').read_text()) if (path/'status.json').exists() else {}
+            if status.get('phase') not in ('complete','failed','cancelled'):names.add(name)
+        except (ValueError,IndexError,OSError,json.JSONDecodeError):
+            continue
+    return sorted(names)
 
 
 def serve(port=8766):
@@ -36,6 +59,8 @@ def serve(port=8766):
                     if proc and proc.poll() is not None and result['status'].get('phase') not in ('complete','failed','cancelled'):
                         result['status']={'phase':'failed','error':f'Analysis process exited with code {proc.returncode}. See results/studies/configurations/{name}.log'}
                     return self.send(result)
+                if parsed.path=='/api/active-runs':
+                    return self.send(active_runs())
                 if parsed.path=='/api/runs':
                     return self.send([p.name for p in sorted((ROOT/'results/studies').glob('*')) if (p/'config.json').exists()])
                 if parsed.path.startswith('/results/'):
@@ -50,7 +75,8 @@ def serve(port=8766):
                             if p.name!='index.json':entries.append({'path':str(p.relative_to(ROOT)),'data':json.loads(p.read_text())})
                     return self.send(entries)
                 if parsed.path=='/api/status':
-                    name=parse_qs(parsed.query).get('run_id',[state['run_id']])[0];p=run_path(name) if name else None
+                    discovered=active_runs()
+                    name=parse_qs(parsed.query).get('run_id',[state['run_id'] or next(iter(discovered),None)])[0];p=run_path(name) if name else None
                     status=json.loads((p/'status.json').read_text()) if p and (p/'status.json').exists() else {'phase':'idle'}
                     events=[]
                     if p and (p/'events.jsonl').exists():
@@ -73,7 +99,7 @@ def serve(port=8766):
                             status=dict(status,phase='failed',error=f'Run process exited with code {code}. '+detail)
                     config=json.loads((p/'config.json').read_text()) if p and (p/'config.json').exists() else None
                     tasks=json.loads((p/'tasks.json').read_text()) if p and (p/'tasks.json').exists() else []
-                    return self.send(dict(run_id=name,status=status,events=events,config=config,tasks=tasks,running=proc is not None and proc.poll() is None))
+                    return self.send(dict(run_id=name,status=status,events=events,config=config,tasks=tasks,running=(proc is not None and proc.poll() is None) or name in discovered,can_stop=proc is not None and proc.poll() is None))
                 assets={'/site.css':('dashboard/site.css','text/css'),'/site.js':('dashboard/site.js','text/javascript'),'/analyze.html':('dashboard/analyze.html','text/html'),'/analyze.js':('dashboard/analyze.js','text/javascript'),'/analyze.css':('dashboard/analyze.css','text/css'),'/':('dashboard/study.html','text/html'),'/study.js':('dashboard/study.js','text/javascript'),'/styles.css':('dashboard/styles.css','text/css'),'/study.css':('dashboard/study.css','text/css'),'/docs.html':('dashboard/docs.html','text/html')}
                 if self.path in assets:
                     filename,mime=assets[self.path];return self.send((ROOT/filename).read_bytes(),mime)

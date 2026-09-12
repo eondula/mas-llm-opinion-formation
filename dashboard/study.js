@@ -120,7 +120,7 @@ $('checkpoint').oninput=()=>{following=false;lastIndex=Number($('checkpoint').va
 $('follow').onclick=()=>{following=true;$('follow').textContent='Following live';lastIndex=Math.max(0,events.length-1);selectedTask=events[lastIndex]?.task;draw(lastIndex);};
 $('condition').onchange=()=>{selectedTask=$('condition').value;following=false;lastIndex=events.map(e=>e.task).lastIndexOf(selectedTask);draw(lastIndex);};
 $('play').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('play').textContent='Play responses';return;}following=false;const indices=events.map((e,i)=>e.task===selectedTask?i:-1).filter(i=>i>=0);let at=0;timer=setInterval(()=>{if(at>=indices.length){clearInterval(timer);timer=null;$('play').textContent='Play responses';return;}lastIndex=indices[at++];$('checkpoint').value=lastIndex;draw(lastIndex);},Number($('playback-speed').value));$('play').textContent='Pause';};
-async function poll(){try{const d=await api('status'+($('saved-run').value?'?run_id='+encodeURIComponent($('saved-run').value):''));activeConfig=d.config;activeTasks=d.tasks||[];$('zip-download').hidden=!d.run_id;$('zip-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/paper_outputs.zip';$('figure-download').hidden=!d.run_id;$('figure-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/figures/index.html';updateHeading();$('connection').textContent='Connected';$('run-state').textContent=d.status.phase;$('progress').textContent=`${d.status.completed||0} / ${d.status.total||0}`;$('study-progress').max=d.status.total||1;$('study-progress').value=d.status.completed||0;$('timing').textContent=`Elapsed ${Math.round(d.status.elapsed_seconds||0)}s · ETA ${d.status.estimated_remaining_seconds==null?'estimating':Math.round(d.status.estimated_remaining_seconds)+'s'}`;$('run').disabled=d.running;$('stop').disabled=!d.running;
+async function poll(){try{const d=await api('status'+($('saved-run').value?'?run_id='+encodeURIComponent($('saved-run').value):''));activeConfig=d.config;activeTasks=d.tasks||[];$('zip-download').hidden=!d.run_id;$('zip-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/paper_outputs.zip';$('figure-download').hidden=!d.run_id;$('figure-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/figures/index.html';updateHeading();$('connection').textContent='Connected';$('run-state').textContent=d.status.phase;$('progress').textContent=`${d.status.completed||0} / ${d.status.total||0}`;$('study-progress').max=d.status.total||1;$('study-progress').value=d.status.completed||0;$('timing').textContent=`Elapsed ${Math.round(d.status.elapsed_seconds||0)}s · ETA ${d.status.estimated_remaining_seconds==null?'estimating':Math.round(d.status.estimated_remaining_seconds)+'s'}`;$('run').disabled=d.running;$('stop').disabled=!d.can_stop;
  if(d.run_id!==currentRun||d.events.length!==events.length||lastPhase!==d.status.phase){lastPhase=d.status.phase;currentRun=d.run_id;events=d.events;const tasks=[...new Set(events.map(e=>e.task))];$('condition').replaceChildren(...tasks.map(t=>new Option('Conversation '+t,t)));if(following||!tasks.includes(selectedTask)){lastIndex=Math.max(0,events.length-1);selectedTask=events[lastIndex]?.task;} $('condition').value=selectedTask||'';$('checkpoint').max=Math.max(0,events.length-1);$('checkpoint').value=lastIndex;$('checkpoint').disabled=!events.length;$('play').disabled=!events.length;draw(lastIndex);}if(d.status.error)$('error').textContent=d.status.error;
  }catch(e){$('connection').textContent='Disconnected';$('error').textContent=e.message;}}
 setInterval(poll,2000);poll();draw(0);
@@ -136,7 +136,17 @@ function chart(container, trajectories, caption) {
   names.forEach((name,j)=>{const values=trajectories[name]||[],color=['var(--plot-1)','var(--plot-2)','var(--plot-3)','var(--plot-4)'][j%4];const points=values.map((v,i)=>`${x(i)},${y(v)}`).join(' ');make('polyline',{points,fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':['','6 4','2 3','9 3 2 3'][j%4]});values.forEach((v,i)=>{const dot=make('circle',{cx:x(i),cy:y(v),r:3,fill:color});const title=document.createElementNS(ns,'title');title.textContent=`${name} · round ${i}: ${fmt(v)}`;dot.append(title);});});box.append(svg);
 }
 
-api('runs').then(runs=>{for(const run of runs)$('saved-run').add(new Option(run,run));});$('saved-run').onchange=()=>{currentRun=null;events=[];poll();};
+async function refreshRuns(){
+ try {
+  const [runs,active]=await Promise.all([api('runs'),api('active-runs')]);
+  const select=$('saved-run'),selected=select.value;
+  select.replaceChildren(new Option('Active run (automatic)',''));
+  for(const run of [...active,...runs.filter(r=>!active.includes(r))])
+   select.add(new Option(active.includes(run)?run+' · running':run,run));
+  select.value=selected;
+ } catch(e) { /* Status polling reports connection errors. */ }
+}
+refreshRuns();setInterval(refreshRuns,5000);$('saved-run').onchange=()=>{currentRun=null;events=[];poll();};
 
 // Synchronous delivery is displayed as one complete round; sequential delivery
 // follows the selected receiver's actual recorded event.
