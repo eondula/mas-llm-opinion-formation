@@ -31,7 +31,7 @@ def summary(task, record):
     return result
 
 
-def export(path):
+def export(path, persona_comparison=False):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -41,10 +41,12 @@ def export(path):
     for f in sorted((path/'conversations').glob('*.json')):
         record=json.loads(f.read_text());c=record['config']
         kind='homogeneous' if len(set(c['models']))==1 else 'heterogeneous'
-        groups[(record['scenario']['id'],kind,c['schedule'],'natural' if c['initialization']=='natural' else 'forced_A1_B2')].append((f.stem,record))
-        summaries[kind].append(summary(f.stem,record))
+        groups[(record['scenario']['id'],kind,c['schedule'],'natural' if c['initialization']=='natural' else 'forced_A1_B2', ('persona' if c.get('persona') else 'no_persona') if persona_comparison else '')].append((f.stem,record))
+        result=summary(f.stem,record)
+        if persona_comparison:result['persona']=bool(c.get('persona'))
+        summaries[kind].append(result)
     generated=[]
-    for (scenario,kind,schedule,start),records in groups.items():
+    for (scenario,kind,schedule,start,persona),records in groups.items():
         fig,axes=plt.subplots(len(records),2,figsize=(13,3.5*len(records)),squeeze=False,layout='constrained')
         for axrow,(task,rec) in zip(axes,records):
             agents=sorted({r['agent'] for r in rec['rows']})
@@ -59,7 +61,8 @@ def export(path):
             model=rec['rows'][0]['model'].split('/')[-1] if kind=='homogeneous' else 'Fixed heterogeneous pair'
             axrow[0].set_title(model+' · stance');axrow[1].set_title(model+' · sentiment')
         fig.suptitle(f"{records[0][1]['scenario']['title']}\n{kind.capitalize()} · {'Synchronous' if schedule=='synchronous' else 'Sequential (A then B)'} · {start.replace('_',' ')} · combined flexible reasoning")
-        name=f'{scenario}_{kind}_{schedule}_{start}.png';fig.savefig(folder/name,dpi=180);plt.close(fig);generated.append(name)
+        if persona_comparison:fig.suptitle(fig._suptitle.get_text()+' · '+persona.replace('_',' '))
+        name=f'{scenario}_{kind}_{schedule}_{start}'+('_'+persona if persona else '')+'.png';fig.savefig(folder/name,dpi=180);plt.close(fig);generated.append(name)
     for kind,data in summaries.items():
         if not data:continue
         with (tables/f'{kind}_summary.csv').open('w',newline='') as out:

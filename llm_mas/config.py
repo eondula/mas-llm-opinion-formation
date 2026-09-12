@@ -96,8 +96,10 @@ def resolve(raw):
     if set(c.get('research', [])) - {'validation', 'history', 'replay', 'prediction', 'mechanistic', 'heads', 'source_spans', 'continuation', 'sufficiency'}: raise ValueError('Unknown research module')
     if c['mode'] == 'preview' and (c.get('conditions') or c.get('research')): raise ValueError('Preview runs one conversation; conditions and research require study mode')
     for condition in c.get('conditions', []):
-        if set(condition) - {'initialization','schedule','argument_mode','presentation_order'}: raise ValueError('Invalid condition fields')
+        if set(condition) - {'initialization','schedule','argument_mode','presentation_order','persona'}: raise ValueError('Invalid condition fields')
         resolve(dict(c, **condition, conditions=[]))
+    if not isinstance(c.get('persona', False), bool):
+        raise ValueError('Persona must be true or false')
     if c.get('persona'):
         for record in records:
             roles = record.get('persona_roles', {})

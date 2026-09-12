@@ -5,6 +5,9 @@ from pathlib import Path
 
 def render(path):
     path = Path(path)
+    if (path/'config.json').exists() and json.loads((path/'config.json').read_text()).get('export_profile') == 'experiment_d':
+        from .experiment_d import export
+        return export(path)
     if (path/'config.json').exists() and json.loads((path/'config.json').read_text()).get('export_profile') == 'experiment_c':
         from .experiment_c import export
         return export(path)

@@ -336,3 +336,30 @@ not force public choices. Initialization remains an independent setting. Prompt
 preview shows every agent's initial context. Scenarios must define both
 `persona_roles`; missing roles produce a validation error. No persona adds no
 role instruction. Quick preview continues to run one conversation.
+
+### Experiment D: persona comparison, 10 update rounds
+
+```bash
+.venv/bin/python -m llm_mas study --config studies/experiment_D.json --run-id experiment_D_v1
+```
+
+The preset crosses Sensor/Storage, the four Experiment C checkpoint assignments,
+no persona/persona, natural/forced A:S1 B:S2 starts, and synchronous/forward
+sequential delivery. It produces 64 conversations and 1,408 responses (round 0
+plus 10 updates per agent). Both persona conditions use the current
+`combined_reasoning` paragraph prompt, greedy generation, at most 128 explanation
+tokens, full retained history, and sentiment scoring. The research list is empty;
+there is no internal replay, activation capture, or intervention analysis.
+
+After scoring, exports in the same run's `figures/` folder contain 32 grouped
+stance/sentiment PNGs and four public-choice overview PNGs. No PDFs are created.
+`tables/` contains homogeneous/heterogeneous outcome summaries with persona
+labels, per-response margins and changes, public/post-stance mismatches,
+repetition and paragraph-format checks, stance/sentiment changes, and matched
+persona and schedule comparisons. Format checks are heuristics, not guarantees
+of semantic compliance. Forced initial transitions and scored switches are
+separate columns. Agreement is measured only through the observed final round.
+All figures and tables are included in `paper_outputs.zip`.
+
+This differs from Experiment C v2 in prompt wording and duration as well as the
+added persona factor. Use within-D matched conditions for persona comparisons.

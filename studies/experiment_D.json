@@ -1,0 +1,51 @@
+{
+  "mode": "study",
+  "export_profile": "experiment_d",
+  "agents": 2,
+  "models": [
+    "Qwen/Qwen2.5-1.5B-Instruct"
+  ],
+  "model_configurations": [
+    [
+      "Qwen/Qwen2.5-1.5B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-3B-Instruct"
+    ],
+    [
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-1.5B-Instruct",
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+    ]
+  ],
+  "scenarios": [
+    "sensor",
+    "storage"
+  ],
+  "rounds": 10,
+  "initialization": "natural",
+  "argument_mode": "combined_reasoning",
+  "sentiment": true,
+  "max_argument_tokens": 128,
+  "grid": {
+    "schedule": [
+      "synchronous",
+      "sequential"
+    ],
+    "initialization": [
+      "natural",
+      [
+        1,
+        2
+      ]
+    ],
+    "persona": [
+      false,
+      true
+    ]
+  },
+  "research": [],
+  "persona": false
+}
