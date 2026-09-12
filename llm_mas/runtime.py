@@ -4,15 +4,21 @@ import weakref
 class Runtime:
     instances=weakref.WeakSet()
     def __init__(self, name, device='auto'):
+        print(f'Loading {name}: importing PyTorch', flush=True)
         import torch
+        print(f'Loading {name}: importing Transformers', flush=True)
         from transformers import AutoTokenizer, AutoModelForCausalLM
         self.torch = torch
         self.device = device if device != 'auto' else ('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
+        print(f'Loading {name}: tokenizer', flush=True)
         self.tokenizer = AutoTokenizer.from_pretrained(name)
+        print(f'Loading {name}: model weights', flush=True)
         self.model = AutoModelForCausalLM.from_pretrained(name, torch_dtype='auto').eval()
         self.instances.add(self)
+        print(f'Loading {name}: moving to {self.device}', flush=True)
         self.activate()
         self.name = name
+        print(f'Ready: {name} on {self.device}', flush=True)
 
     def activate(self):
         for other in list(self.instances):
@@ -34,8 +40,14 @@ class Runtime:
         start = len(prefix)
         if encoded.input_ids[0,:start].tolist()!=prefix:raise ValueError('Candidate changes prompt token boundary')
         with self.torch.inference_mode():
-            lp = self.torch.log_softmax(self.model(**encoded).logits, dim=-1)
-        values = [lp[0, i-1, encoded.input_ids[0,i]].item() for i in range(start, encoded.input_ids.shape[1])]
+            options = {'use_cache':False} if hasattr(self.model.config, 'use_cache') else {}
+            output = self.model(**encoded, **options)
+            # Only candidate prediction positions contribute to this likelihood.
+            logits = output.logits[:, start-1:encoded.input_ids.shape[1]-1, :].clone()
+            del output
+            lp = self.torch.log_softmax(logits, dim=-1)
+            ids = encoded.input_ids[:, start:]
+            values = lp.gather(-1, ids.unsqueeze(-1)).squeeze(-1)[0].tolist()
         return sum(values), values, rendered
 
     def measure(self, history, scenario, texts):

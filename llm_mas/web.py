@@ -14,6 +14,22 @@ from .config import ROOT, resolve, run_path, scenario, validate_scenario, resolv
 from .runner import write
 
 
+def display_event(event):
+    """Send only fields used by dashboard playback; raw results stay on disk."""
+    row=event['row']
+    small={k:row[k] for k in ('round','agent','model','strategy','forced','message','argument','sentiment','deliveries') if k in row}
+    small['post']={'stance':row.get('post',{}).get('stance')}
+    return dict(task=event['task'],row=small)
+
+
+def live_status(status, modified, now=None):
+    """Keep elapsed time moving between worker status writes."""
+    age=max(0, (time.time() if now is None else now)-modified)
+    return dict(status, elapsed_seconds=status.get('elapsed_seconds',0)+age,
+                phase_elapsed_seconds=status.get('phase_elapsed_seconds',0)+age,
+                seconds_since_update=age)
+
+
 def active_runs():
     """Discover running CLI studies, including ones started before the server."""
     try:
@@ -81,14 +97,14 @@ def serve(port=8766):
                     events=[]
                     if p and (p/'events.jsonl').exists():
                         for line in (p/'events.jsonl').read_text().splitlines():
-                            try: events.append(json.loads(line))
+                            try: events.append(display_event(json.loads(line)))
                             except json.JSONDecodeError:pass
                     proc=state['process'] if name==state['run_id'] else None
                     if p and (p/'conversations').exists():
                         completed={f.stem:json.loads(f.read_text()) for f in (p/'conversations').glob('*.json')}
                         events=[e for e in events if e['task'] not in completed]
                         for task, record in completed.items():
-                            events.extend(dict(task=task,row=row) for row in record['rows'])
+                            events.extend(display_event(dict(task=task,row=row)) for row in record['rows'])
                         events.sort(key=lambda e:(e['task'],e['row']['round']))
                     if proc is not None:
                         code=proc.poll()
@@ -97,6 +113,14 @@ def serve(port=8766):
                             log_path=ROOT/'results/studies/configurations'/f'{name}.log'
                             detail=log_path.read_text()[-4000:] if log_path.exists() else ''
                             status=dict(status,phase='failed',error=f'Run process exited with code {code}. '+detail)
+                    running = (proc is not None and proc.poll() is None) or name in discovered
+                    if running and p and (p/'status.json').exists():
+                        status = live_status(status, (p/'status.json').stat().st_mtime)
+                        log_path=ROOT/'results/studies/configurations'/f'{name}.log'
+                        if log_path.exists():
+                            with log_path.open('rb') as log:
+                                log.seek(max(0, log_path.stat().st_size-2000))
+                                status['log_tail']=log.read().decode('utf-8',errors='replace')
                     config=json.loads((p/'config.json').read_text()) if p and (p/'config.json').exists() else None
                     tasks=json.loads((p/'tasks.json').read_text()) if p and (p/'tasks.json').exists() else []
                     return self.send(dict(run_id=name,status=status,events=events,config=config,tasks=tasks,running=(proc is not None and proc.poll() is None) or name in discovered,can_stop=proc is not None and proc.poll() is None))
@@ -123,7 +147,7 @@ def serve(port=8766):
                 if self.path=='/api/preview':
                     from .prompts import templates,initial
                     config=resolve(data)
-                    return self.send(dict(config=config,prompts=[initial(s,templates(),config['presentation_order'],config['agents']) for s in config['scenarios']]))
+                    return self.send(dict(config=config,prompts=[initial(s,templates(),config['presentation_order'],config['agents'],persona=i%2+1 if config.get('persona') else None) for s in config['scenarios'] for i in range(config['agents'] if config.get('persona') else 1)]))
                 with lock:
                     proc=state['process']
                     if self.path=='/api/stop':
@@ -139,7 +163,7 @@ def serve(port=8766):
                         path=ROOT/'results/studies/configurations'/f'{name}.json'
                         write(path,data)
                         with path.with_suffix('.log').open('w') as log:
-                            process=subprocess.Popen([sys.executable,'-m','llm_mas','analyze','--config',str(path),'--run-id',name],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT)
+                            process=subprocess.Popen([sys.executable,'-u','-m','llm_mas','analyze','--config',str(path),'--run-id',name],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT)
                         state.update(process=process,run_id=name)
                         return self.send({'run_id':name})
                     if self.path=='/api/run':
@@ -150,7 +174,7 @@ def serve(port=8766):
                         path=ROOT/'results/studies/configurations'/f'{name}.json'
                         write(path,config)
                         log=path.with_suffix('.log').open('w')
-                        command=[sys.executable,'-m','llm_mas','study','--config',str(path),'--run-id',name]
+                        command=[sys.executable,'-u','-m','llm_mas','study','--config',str(path),'--run-id',name]
                         state.update(process=subprocess.Popen(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT),run_id=name)
                         log.close()
                         return self.send({'run_id':name})

@@ -23,10 +23,13 @@ class ExperimentCTests(unittest.TestCase):
         self.assertTrue(all(t['argument_mode']=='combined_reasoning' and t['initialization'] in ('natural',[1,2]) for t in tasks))
         mixed={tuple(t['models']) for t in tasks if len(set(t['models']))>1}
         self.assertEqual(mixed,{('Qwen/Qwen2.5-1.5B-Instruct','HuggingFaceTB/SmolLM2-1.7B-Instruct')})
-        ui=resolve(dict(mode='experiment_c',paper_suite=True,agents=4,rounds=3,scenarios=['storage'],argument_mode='generated'))
-        self.assertEqual(ui['agents'],2);self.assertEqual(ui['rounds'],3)
-        self.assertEqual(len(list(configurations(ui))),16)
-        self.assertEqual(ui['argument_mode'],'combined_reasoning')
+        ui=resolve(dict(mode='experiment_c',agents=4,rounds=3,scenarios=['storage'],argument_mode='generated',schedule='reverse_sequential',initialization=[2,1,2,1]))
+        self.assertEqual(ui['agents'],4);self.assertEqual(ui['rounds'],3)
+        self.assertEqual(len(list(configurations(ui))),1)
+        self.assertEqual(ui['argument_mode'],'generated')
+        self.assertEqual(ui['schedule'],'reverse_sequential')
+        self.assertEqual(ui['initialization'],[2,1,2,1])
+        self.assertNotIn('export_profile',ui)
 
     def test_saved_outputs_png_only(self):
         from llm_mas.runner import execute
@@ -34,7 +37,7 @@ class ExperimentCTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/'run'
             with patch('llm_mas.runner.run_path',return_value=path),patch('llm_mas.runtime.Runtime',Fake),patch('llm_mas.sentiment.measure_sentiment',return_value={'sentiment_score':.25}):
-                execute(dict(mode='experiment_c',rounds=1,scenarios=['storage']),name='test_c')
+                execute(dict(json.loads((ROOT/'studies/experiment_C.json').read_text()),rounds=1,scenarios=['storage']),name='test_c')
             self.assertEqual(len(list((path/'conversations').glob('*.json'))),16)
             pngs=list((path/'figures').glob('*.png'));self.assertEqual(len(pngs),8)
             for png in pngs:

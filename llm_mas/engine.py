@@ -9,7 +9,7 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
     n = config['agents']
     names = [f'Agent {chr(65+i)}' if i < 26 else f'Agent {i+1}' for i in range(n)]
     models = config['models'] * n if len(config['models']) == 1 else config['models']
-    histories = [initial(scenario, texts, config['presentation_order'], n) for _ in names]
+    histories = [initial(scenario, texts, config['presentation_order'], n, persona=i%2+1 if config.get('persona') else None) for i, _ in enumerate(names)]
     counts = [{1:0,2:0} for _ in names]
     messages, rows = [None]*n, []
     for t in range(config['rounds']+1):

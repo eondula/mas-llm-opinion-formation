@@ -4,10 +4,13 @@ def templates():
     names = ('system', 'scenario', 'starting_assessment', 'peer_message', 'stance_probe', 'generate_argument', 'select_argument', 'conversational_argument', 'combined_fixed', 'combined_reasoning')
     return {name: (ROOT / 'prompts' / f'{name}.txt').read_text() for name in names}
 
-def initial(scenario, texts, order='strategy_1_first', agents=2):
+def initial(scenario, texts, order='strategy_1_first', agents=2, persona=None):
     a, b = scenario['strategy_1'], scenario['strategy_2']
     if order == 'strategy_2_first': a, b = b, a
     system = texts['system']
+    if persona is not None:
+        role = scenario['persona_roles'][f'strategy_{persona}']
+        system += '\n\nYour role: ' + role['role_name'] + '.\n' + role['priority']
     if agents > 2:
         system = system.replace('another artificial agent', 'other artificial agents')
     return [{'role':'system', 'content':system}, {'role':'user', 'content':texts['scenario'].format(

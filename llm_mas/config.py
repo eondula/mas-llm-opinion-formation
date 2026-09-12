@@ -38,12 +38,19 @@ def validate_scenario(data):
         raise ValueError('Candidate statements must differ')
 
 def resolve(raw):
+    if raw.get('preview_preset'):
+        if raw['preview_preset'] not in ('persona', 'no_persona'):
+            raise ValueError('Unknown quick preview preset')
+        raw = dict(raw, persona=raw['preview_preset'] == 'persona')
     if raw.get('mode') == 'experiment_c':
-        import json
         preset = json.loads((ROOT/'studies/experiment_C.json').read_text())
-        # Dashboard controls that remain meaningful for this fixed comparison.
-        preset.update({k:raw[k] for k in ('scenarios','rounds','max_argument_tokens','device','run_id') if k in raw})
-        raw = preset
+        # Use protocol defaults, but only expand factors explicitly requested.
+        for key in ('grid', 'model_configurations', 'export_profile'):
+            preset.pop(key, None)
+        raw = dict(preset, **raw)
+        raw['mode'] = 'study'
+        raw['preset'] = 'experiment_c'
+
 
     c = dict(mode='preview', models=[DEFAULT_MODEL], agents=2, scenarios=['storage'], rounds=20,
              initialization='natural', schedule='synchronous', argument_mode='predefined',
@@ -51,7 +58,6 @@ def resolve(raw):
     c.update(raw)
     c['conditions'] = c.get('conditions') or []
     if c.pop('paper_suite', False):
-        import json
         paper=json.loads((ROOT/'studies/paper.json').read_text())
         c['research']=paper['research']
         c['grid']=paper['grid']
@@ -92,6 +98,13 @@ def resolve(raw):
     for condition in c.get('conditions', []):
         if set(condition) - {'initialization','schedule','argument_mode','presentation_order'}: raise ValueError('Invalid condition fields')
         resolve(dict(c, **condition, conditions=[]))
+    if c.get('persona'):
+        for record in records:
+            roles = record.get('persona_roles', {})
+            for key in ('strategy_1', 'strategy_2'):
+                role = roles.get(key, {})
+                if not all(isinstance(role.get(f), str) and role[f].strip() for f in ('role_name', 'priority')):
+                    raise ValueError('Persona requires scenario role_name and priority for both strategies')
     c['scenarios'] = records
     return c
 

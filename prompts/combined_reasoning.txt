@@ -2,7 +2,10 @@ Choose a strategy and explain your choice using the provided arguments.
 
 Respond to the latest peer reasoning when available; otherwise, give
 your own rationale. You may combine and rephrase arguments and acknowledge
-tradeoffs. Avoid unnecessary repetition and do not introduce new facts.
+tradeoffs. Weave the relevant arguments directly into one short explanatory
+paragraph of 2-3 sentences. Do not copy the argument pool as a separate list.
+Do not use bullet points or headings such as "Arguments:" or "Explanation:".
+Avoid unnecessary repetition and do not introduce new facts.
 
 STRATEGY 1
 Candidate:
@@ -17,4 +20,6 @@ Arguments:
 {arguments_2}
 
 
-Return the exact candidate statement, followed by your explanation.
+Return the exact candidate statement, followed by a newline and the single
+explanatory paragraph. The arguments belong within that paragraph, not in a
+separate section.

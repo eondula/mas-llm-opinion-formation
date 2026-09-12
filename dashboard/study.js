@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);let catalog=[],events=[],lastIndex=0;
 async function api(path,data){const r=await fetch('/api/'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{});const v=await r.json();if(!r.ok)throw Error(v.error);return v;}
-function config(){return {paper_suite:$('mode').value==='study'&&$('paper-suite').checked,run_id:$('run-id').value.trim()||undefined,mode:$('mode').value,agents:Number($('agents').value),agent_configuration:$('agent-configuration').value,models:$('models').value.split('\n').map(s=>s.trim()).filter(Boolean),scenarios:[...$('scenarios').selectedOptions].map(o=>o.value),rounds:Number($('rounds').value),initialization:$('initialization').value==='natural'?'natural':[...$('forced-strategies').querySelectorAll('select')].map(el=>Number(el.value)),schedule:$('schedule').value,argument_mode:$('argument_mode').value,max_argument_tokens:Number($('max_argument_tokens').value),research:$('mode').value==='study'?[...document.querySelectorAll('[name=research]:checked')].map(x=>x.value):[],conditions:$('mode').value==='study'&&$('conditions').value.trim()?JSON.parse($('conditions').value):[]};}
+function config(){return {preview_preset:$('mode').value==='preview'?$('preview-preset').value:undefined,paper_suite:$('mode').value==='study'&&$('paper-suite').checked,run_id:$('run-id').value.trim()||undefined,mode:$('mode').value,agents:Number($('agents').value),agent_configuration:$('agent-configuration').value,models:$('models').value.split('\n').map(s=>s.trim()).filter(Boolean),scenarios:[...$('scenarios').selectedOptions].map(o=>o.value),rounds:Number($('rounds').value),initialization:$('initialization').value==='natural'?'natural':[...$('forced-strategies').querySelectorAll('select')].map(el=>Number(el.value)),schedule:$('schedule').value,argument_mode:$('argument_mode').value,max_argument_tokens:Number($('max_argument_tokens').value),research:$('mode').value==='study'?[...document.querySelectorAll('[name=research]:checked')].map(x=>x.value):[],conditions:$('mode').value==='study'&&$('conditions').value.trim()?JSON.parse($('conditions').value):[]};}
 async function load(){catalog=await api('scenarios');$('scenarios').replaceChildren();for(const e of catalog){const o=new Option(e.data.title,e.path);o.selected=e.path.endsWith('/storage.json')||($('mode').value!=='preview'&&e.path.endsWith('/sensor.json'));$('scenarios').add(o);}}
 function safe(fn){return async()=>{try{$('error').textContent='';await fn();}catch(e){$('error').textContent=e.message;}};}
 $('mode').onchange=()=>{$('agents').disabled=false;$('scenarios').multiple=$('mode').value!=='preview';safe(load)();};$('mode').onchange();
@@ -120,9 +120,14 @@ $('checkpoint').oninput=()=>{following=false;lastIndex=Number($('checkpoint').va
 $('follow').onclick=()=>{following=true;$('follow').textContent='Following live';lastIndex=Math.max(0,events.length-1);selectedTask=events[lastIndex]?.task;draw(lastIndex);};
 $('condition').onchange=()=>{selectedTask=$('condition').value;following=false;lastIndex=events.map(e=>e.task).lastIndexOf(selectedTask);draw(lastIndex);};
 $('play').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('play').textContent='Play responses';return;}following=false;const indices=events.map((e,i)=>e.task===selectedTask?i:-1).filter(i=>i>=0);let at=0;timer=setInterval(()=>{if(at>=indices.length){clearInterval(timer);timer=null;$('play').textContent='Play responses';return;}lastIndex=indices[at++];$('checkpoint').value=lastIndex;draw(lastIndex);},Number($('playback-speed').value));$('play').textContent='Pause';};
-async function poll(){try{const d=await api('status'+($('saved-run').value?'?run_id='+encodeURIComponent($('saved-run').value):''));activeConfig=d.config;activeTasks=d.tasks||[];$('zip-download').hidden=!d.run_id;$('zip-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/paper_outputs.zip';$('figure-download').hidden=!d.run_id;$('figure-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/figures/index.html';updateHeading();$('connection').textContent='Connected';$('run-state').textContent=d.status.phase;$('progress').textContent=`${d.status.completed||0} / ${d.status.total||0}`;$('study-progress').max=d.status.total||1;$('study-progress').value=d.status.completed||0;$('timing').textContent=`Elapsed ${Math.round(d.status.elapsed_seconds||0)}s · ETA ${d.status.estimated_remaining_seconds==null?'estimating':Math.round(d.status.estimated_remaining_seconds)+'s'}`;$('run').disabled=d.running;$('stop').disabled=!d.can_stop;
+let polling=false;
+async function poll(){if(polling)return;polling=true;try{const d=await api('status'+($('saved-run').value?'?run_id='+encodeURIComponent($('saved-run').value):''));activeConfig=d.config;activeTasks=d.tasks||[];$('zip-download').hidden=!d.run_id;$('zip-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/paper_outputs.zip';$('figure-download').hidden=!d.run_id;$('figure-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/figures/index.html';updateHeading();$('connection').textContent='Connected';$('run-state').textContent=d.status.phase;$('progress').textContent=`${d.status.completed||0} / ${d.status.total||0}`;$('study-progress').max=d.status.total||1;$('study-progress').value=d.status.completed||0;$('timing').textContent=`Elapsed ${Math.round(d.status.elapsed_seconds||0)}s · ETA ${d.status.estimated_remaining_seconds==null?'estimating':Math.round(d.status.estimated_remaining_seconds)+'s'}`;$('run').disabled=d.running;$('stop').disabled=!d.can_stop;
+ if(d.running && !d.events.length) {
+  $('title').textContent='Preparing the conversation…';
+  $('description').textContent=d.status.log_tail?.trim().split(/\r?\n/).filter(Boolean).at(-1)||('Loading '+(d.status.model||'model')+' · first response pending');
+ }
  if(d.run_id!==currentRun||d.events.length!==events.length||lastPhase!==d.status.phase){lastPhase=d.status.phase;currentRun=d.run_id;events=d.events;const tasks=[...new Set(events.map(e=>e.task))];$('condition').replaceChildren(...tasks.map(t=>new Option('Conversation '+t,t)));if(following||!tasks.includes(selectedTask)){lastIndex=Math.max(0,events.length-1);selectedTask=events[lastIndex]?.task;} $('condition').value=selectedTask||'';$('checkpoint').max=Math.max(0,events.length-1);$('checkpoint').value=lastIndex;$('checkpoint').disabled=!events.length;$('play').disabled=!events.length;draw(lastIndex);}if(d.status.error)$('error').textContent=d.status.error;
- }catch(e){$('connection').textContent='Disconnected';$('error').textContent=e.message;}}
+ }catch(e){$('connection').textContent='Disconnected';$('error').textContent=e.message;}finally{polling=false;}}
 setInterval(poll,2000);poll();draw(0);
 function chart(container, trajectories, caption) {
   const box=$(container);box.replaceChildren();
@@ -188,12 +193,13 @@ $('agent-configuration').onchange=modelControls;
 $('shared-model').onchange=syncModels;
 modelControls();
 
-// Experiment C fixes the comparison factors; other modes keep their controls.
-const previousExperimentModeChange = $('mode').onchange;
-$('mode').onchange = () => {
- previousExperimentModeChange();
- const fixed = $('mode').value === 'experiment_c';
- $('experiment-c-help').hidden = !fixed;
- for (const id of ['agents','agent-configuration','shared-model','initialization','schedule','argument_mode','paper-suite','conditions']) $(id).disabled = fixed;
- for (const el of document.querySelectorAll('#agent-models select, #forced-strategies select, [name=research]')) el.disabled = fixed;
-};
+// Persona changes role instructions only; configuration controls remain editable.
+function personaControls() {
+ const preview = $('mode').value === 'preview';
+ $('preview-preset-label').hidden = !preview;
+ $('persona-help').hidden = !(preview && $('preview-preset').value === 'persona');
+}
+const personaModeChange=$('mode').onchange;
+$('mode').onchange=()=>{personaModeChange();personaControls();};
+$('preview-preset').onchange=personaControls;
+personaControls();

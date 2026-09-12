@@ -234,9 +234,9 @@ three checkpoints runs as a homogeneous pair. Exactly one heterogeneous assignme
 runs: Agent A = Qwen2.5-1.5B-Instruct; Agent B = SmolLM2-1.7B-Instruct. No reversed
 assignment or other mixed combinations are included. Total: 32 conversations.
 
-Dashboard: select **Experiment C** in Run mode. Scenarios, rounds and maximum
-argument tokens remain editable; agent assignments, starts, schedules and argument
-mode are fixed by the preset. Other study settings are ignored for this preset.
+Dashboard: use **Quick preview** for one selected scenario and configuration,
+with either **No persona** or **Persona**. Use **Study** for sweeps. The terminal
+`studies/experiment_C.json` preset retains the full original Experiment C design.
 
 For each scenario, `figures/` contains eight PNGs (four per initialization): homogeneous synchronous,
 homogeneous sequential, heterogeneous synchronous, heterogeneous sequential. Each
@@ -322,3 +322,17 @@ readable line per update rather than terminal control characters.
 Pulling updated code does not add progress reporting to an already-running
 Python process. Existing jobs can finish normally; a newly started job uses the
 new reporting. This analysis does not yet resume partially completed replay work.
+
+### Persona quick preview
+
+Choose **Quick preview**, then **No persona** or **Persona**. Both options use
+exactly the agent count, model configuration, scenario, initialization, schedule,
+argument mode, round count and token limit selected in the controls. Changing
+this preset does not reset settings or impose Experiment C defaults.
+
+With Persona, scenario roles alternate by agent: A/C/etc. receive the Strategy 1
+role, B/D/etc. the Strategy 2 role. Roles persist in system instructions but do
+not force public choices. Initialization remains an independent setting. Prompt
+preview shows every agent's initial context. Scenarios must define both
+`persona_roles`; missing roles produce a validation error. No persona adds no
+role instruction. Quick preview continues to run one conversation.
