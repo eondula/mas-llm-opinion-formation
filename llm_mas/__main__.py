@@ -23,12 +23,20 @@ def main():
         parser.add_argument('--run-id')
         parser.add_argument('--dry-run',action='store_true')
     analyze=sub.add_parser('analyze');analyze.add_argument('--config',required=True);analyze.add_argument('--run-id',required=True)
+    analysis_c=sub.add_parser('analyze-c', help='Analyze Experiment C in its existing output folders')
+    analysis_c.add_argument('--run-id',required=True)
+    analysis_c.add_argument('--stage',choices=['behavioral','all'],default='behavioral')
+    analysis_c.add_argument('--device',choices=['auto','cpu','cuda','mps'],default='auto')
+    analysis_c.add_argument('--tolerance',type=float,default=.01,help='Maximum replay/self-patch margin error')
     resume=sub.add_parser('resume');resume.add_argument('--run-id',required=True)
     figures=sub.add_parser('figures');figures.add_argument('--run-id',required=True)
     dashboard=sub.add_parser('dashboard');dashboard.add_argument('--port',type=int,default=8766)
     scenarios=sub.add_parser('scenarios');scenarios.add_argument('action',choices=['list','create','validate'])
     scenarios.add_argument('--id',help='ID for a new scenario');scenarios.add_argument('--template',default='storage');scenarios.add_argument('--output');scenarios.add_argument('--file')
     args=p.parse_args()
+    if args.command=='analyze-c':
+        from .experiment_c_analysis import execute
+        return execute(run_path(args.run_id),args.stage,args.device,args.tolerance)
     if args.command=='analyze':
         from .saved_analysis import execute
         return execute(json.loads(Path(args.config).read_text()),args.run_id)

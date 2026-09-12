@@ -249,3 +249,62 @@ and post-response margins, final stance/sentiment and repeated-message counts.
 Stable agreement is measured only through the observed final round. Raw histories
 and generation metadata remain in conversation JSON. The dashboard's saved-figures
 page and ZIP download include the PNGs and summary CSVs.
+
+### Analyze a completed Experiment C run in place
+
+After pulling this code on the machine holding the results, run:
+
+```bash
+# Uses saved measurements only; no model loading or new conversations.
+.venv/bin/python -m llm_mas analyze-c --run-id experiment_C_v2
+
+# Adds all-layer activation and intervention heatmaps; requires model inference.
+.venv/bin/python -m llm_mas analyze-c --run-id experiment_C_v2 --stage all --device cuda
+```
+
+Outputs go directly into that run's existing `figures/` and `tables/` folders.
+Original conversations and existing figures are retained. The new exports use
+an `analysis_caseNN_` prefix; the existing paper ZIP is not updated.
+
+Selection is deterministic, separately per scenario: longest consecutive public
+disagreement, a scored strategy switch maintained for at least six observed
+rounds including its switch round, repeated scored switches, and the largest
+public-choice difference between matched synchronous/sequential conversations.
+Absent patterns and duplicate selections are recorded in
+`tables/analysis_selection.csv`. Forced initialization and its transition to
+round 1 are excluded from scored-switch counts. A schedule comparison is one
+case containing both conversations. No case is selected using patch outcomes.
+
+For each selected case:
+
+- `*_within_step.png`: separate agent panels with raw before, decision, and post
+  margins; public strategies and scored switches are marked. Forced round zero
+  has no decision point. The corresponding CSV also retains saved sentiment.
+- `*_activation_change.png` (`--stage all`): relative residual-vector change
+  after peer delivery, across every transformer block and update round.
+- `*_intervention_effect.png` (`--stage all`): patched minus baseline full-string
+  decision margin, with markers for hypothetical public-choice flips.
+  `*_layers.csv` includes the plotted values and numerical controls.
+
+For K selected cases, the behavioral stage adds K PNGs; the full stage produces
+3K PNGs. The existing stance/sentiment figures remain available. No PDFs or new
+conversation trajectories are generated.
+
+The fixed site is the residual output of each block at the final prompt token.
+Each intervention independently replaces the after-delivery activation with
+that same agent/checkpoint's before-delivery activation. Token indices may differ
+between contexts; both are recorded. Both candidate strings are rescored under
+the same patch. This tests that site's effect on the saved decision context;
+it does not isolate semantic persuasion from message length or position changes,
+and it is not a layer contribution decomposition or a sentiment intervention.
+Late-layer effects may be small because this site has limited access to later
+candidate positions. Round zero has no peer-delivery heatmap cell.
+
+Replay uses the saved populated decision probe and verifies the exact rendered
+prompt, the unmodified margin, and a self-patch at every layer. A margin error
+above `--tolerance` (default 0.01) stops the analysis. Use the original model
+versions and environment where possible; model revision drift can prevent replay.
+The analysis manifest records source conversation hashes and the protocol.
+All-layer analysis can be expensive: each selected update requires independent
+candidate scoring for every patch and self-patch. Progress prints per layer.
+Rerunning recomputes analysis and replaces only its prefixed exports.
