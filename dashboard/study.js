@@ -76,14 +76,14 @@ function draw(index){
  node.querySelector('.speaker').textContent=name;node.querySelector('.name').textContent=name;node.querySelector('.message').textContent=row?.message||'';
  const active=visible.find(r=>r.agent===name);
  const shown=active;
- node.classList.toggle('is-active',Boolean(active));node.querySelector('.message').textContent=shown?.message||'';
+ node.classList.toggle('is-active',Boolean(active));node.querySelector('.message').textContent=shown?.choice_status==='valid'?`Strategy ${shown.strategy}\n${shown.argument}`:shown?.message||'';
  const bubble=node.querySelector('.bubble');
  const frame=shown?JSON.stringify([currentRun,current,name,shown.round,shown.message]):null;
  bubble.classList.toggle('has-response',Boolean(shown));
  bubble.classList.toggle('response-pop',Boolean(shown)&&bubbleFrames.get(name)!==frame);
  bubbleFrames.set(name,frame);
  node.querySelector('.bubble').classList.toggle('has-response',Boolean(shown));node.querySelector('.circle').className='circle '+(row?.strategy!=null?'s'+row.strategy:'unknown');
- node.querySelector('.strategy-label').textContent=row?(row.strategy==null?'Invalid generated choice':'Strategy '+row.strategy):'No strategy yet';node.querySelector('.forced').textContent=row?.forced?'Forced start':row?(row.choice_status==='valid'?'Generated choice':row.strategy==null?'Invalid output':settings?.decision_mode==='generated'?'Generated choice':'Stance-derived choice'):'';
+ node.querySelector('.strategy-label').textContent=row?(row.strategy==null?'Invalid generated choice':'Strategy '+row.strategy):'No strategy yet';node.querySelector('.forced').textContent=row?.forced?'Forced start':row?(row.choice_status==='valid'?'Generated choice':row.strategy==null?'':settings?.decision_mode==='generated'?'Generated choice':'Stance-derived choice'):'';
  node.querySelector('.activity').textContent=row?`Round ${row.round} · stance ${fmt(row.post.stance)}`:'Waiting';node.querySelector('.message').title=row?.model||'';
  if(n===2&&i===0)arena.insertBefore(node,arena.querySelector('.exchange'));else arena.append(node);
  });

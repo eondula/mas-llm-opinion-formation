@@ -1,0 +1,122 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=24mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,microtype,amsmath,amssymb,booktabs,tabularx,array}
+\usepackage[hidelinks]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.4em}
+\title{Opinion Formation in LLM Multi-Agent Systems\\[4pt]\large Framework Architecture and Full Experimental Setup}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+
+\section{Goal and research questions}
+We propose a controlled LLM multi-agent framework for studying opinion formation in binary choice problems. Each problem presents two alternatives that favor competing attributes, such as measurement precision versus spatial coverage. Neither alternative is uniquely correct, and the task supplies no shared numerical weighting that resolves the tradeoff.
+
+Each agent publicly selects one alternative and generates an explanation using supplied arguments. Through repeated exchange, agents may maintain or revise their choices. Agreement is permitted but not required. Public opinion denotes the selected strategy; stance is a relative-likelihood readout for the two specified endorsements. The overall goal is to evaluate how LLM agents form and revise positions on binary tradeoffs through repeated interaction, considering both individual trajectories and collective outcomes.
+
+The study addresses three research questions:
+\begin{enumerate}
+\item \textbf{Interaction and opinion formation.} How does interaction shape opinion formation in binary choice problems? We compare trajectories with and without peer exchange, under naturally selected and imposed starting positions, to examine changes beyond initial responses and continued self-context.
+\item \textbf{Differences between agents.} What role do differences between agents play in the development of shared or opposing positions? We examine checkpoint assignment and role priorities separately, asking whether these differences translate into different public positions and how those positions evolve during exchange.
+\item \textbf{Observing opinion dynamics.} What can public choices, likelihood readouts, and exchanged explanations jointly reveal about opinion dynamics? We examine where these observations align or diverge and what each contributes to characterizing a conversation.
+\end{enumerate}
+
+Evaluation supports these questions. Scored versus generated choices and reversed presentation assess dependence on elicitation. Message schedules vary information availability, while message and history removals assess sensitivity to particular context components. Fixed-horizon continuation evaluates whether the engineered stopping rule cuts off later changes; termination is part of the experimental protocol, not a core research question about opinion formation.
+
+The intended contribution is an empirical account of how individual positions and collective outcomes develop through interaction under competing priorities, and what the recorded choices, likelihoods, and explanations reveal about that process. Agreement, persistent disagreement, and continued revision are all possible outcomes.
+
+\section{Framework and architecture}
+The framework connects choice elicitation, explanation generation, measurement, and message exchange in a common execution engine for the command line and dashboard. An agent consists of a fixed checkpoint and a separate retained conversation history. Interaction changes the available context; model weights do not change.
+
+The study planner defines the task and experimental conditions. The conversation engine initializes the agents and schedules delivery of public messages. For each response, the runtime scores the two endorsements and selects or generates a choice with an explanation. The recorder retains the response and measurements before delivery, at decision, and after response retention. After a complete round, the termination controller checks whether to continue or stop. Recorded conversations support subsequent comparisons and controlled rescoring of altered contexts.
+
+The stopping mechanism is an engineered protocol policy based on each agent's choice, margin sign, and message similarity. It permits termination in either agreement or disagreement. We evaluate exchange saved and revisions missed relative to continued discussion to assess how this policy affects the observation of opinion dynamics. Public choices, likelihood readouts, and message text remain separately observable.
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}p{3.2cm}X@{}}
+\toprule
+Component & Responsibility\\
+\midrule
+Study planner & Expands experimental factors into conversation configurations.\\
+Agent runtime & Applies the checkpoint's chat template, scores candidates, and generates responses. CUDA, MPS, or CPU is selected by configuration.\\
+Conversation engine & Maintains histories, applies initialization and persona, and delivers messages according to schedule.\\
+Termination controller & Checks each agent's choice, margin sign, and message similarity after a complete round.\\
+Recorder and analysis & Saves configurations, prompts, histories, scores, and stopping checks; exports tables and figures. Completed conversations support resume.\\
+Dashboard & Configures runs and displays messages, choices, trajectories, progress, and stopping reasons.\\
+\bottomrule
+\end{tabularx}
+\caption{Framework architecture. Scheduling and termination are system policies.}
+\end{table}
+
+\section{Tasks and response procedure}
+Sensor contrasts narrower coverage with higher measurement precision against broader coverage with lower precision. Storage contrasts greater storage requirements with higher fidelity against lower requirements with lower fidelity. Strategy 1 denotes the precision/fidelity alternative; Strategy 2 denotes the coverage/storage-saving alternative.
+
+\textbf{Explanation generation.} All full-study configurations use \emph{combined flexible reasoning} (\texttt{combined\_reasoning}). Both fixed endorsement statements and both pools of six supplied arguments remain visible. The agent generates a short explanation from the scenario, retained history, and latest delivered peer message. It may combine and rephrase the supplied reasons, acknowledge tradeoffs, and respond to the peer; it does not select just one predefined argument. At round 0 it gives its own rationale. The prompt requests two or three sentences and prohibits new facts. These are prompt instructions, not guaranteed output properties.
+
+\textbf{Choice procedure.} Both procedures use these same argument pools and flexible explanation instructions. In \emph{scored choice}, the framework selects the endorsement with higher full-string conditional likelihood, prefixes it, and generates the explanation conditioned on that selection. In \emph{generated choice}, the model generates a JSON object containing a strategy number and explanation without a selected endorsement prefix. Its strategy is recorded separately from the likelihood readout. Generation is greedy, with at most 256 new tokens per call: explanation tokens in scored mode and the complete JSON response in generated mode.
+
+Valid enclosing Markdown fences are accepted by the parser; malformed outputs remain invalid, with no score-based repair. Raw generated text is retained and delivered. Output format is therefore part of the procedure comparison. The parser version must be fixed for each run.
+
+Natural initialization uses the selected choice procedure at round 0. Forced initialization assigns opposing endorsements, either A1--B2 or A2--B1, at round 0 only. Persona adds persistent attribute priorities: A favors precision or fidelity; B favors coverage or storage saving. These instructions permit revision.
+
+\section{Measurements and message flow}
+For agent $i$, candidate $C_k=(c_{k,1},\ldots,c_{k,R_k})$, history $H$, and combined instruction $Q$,
+\[
+\ell_{i,k}=\sum_{r=1}^{R_k}\log P_{\theta_i}(c_{k,r}\mid H,Q,c_{k,<r}),
+\qquad m_i=\ell_{i,1}-\ell_{i,2},\qquad s_i=\tanh(m_i/2).
+\]
+Scores are not length normalized. In scored mode, $m_i\geq0$ selects Strategy 1. The engine measures before peer delivery, after delivery at decision, and after retaining the response. Plots show the post-response readout. Forced choices need not match its sign.
+
+At each update, the engine delivers the scheduled message, selects or generates the public choice, appends the complete response, and measures again. Temporary scoring instructions do not accumulate in history. Under synchronous delivery, both agents receive the peer's preceding-round response. Under forward sequential delivery, A updates first and B receives A's current response; reverse sequential delivery exchanges these roles. No-peer runs omit peer delivery but retain self-responses.
+
+Sentiment is a separate SST-2 positive-minus-negative probability score on the public message. It does not affect choice or termination. Exact repetition and embedding similarity describe recurrence. Sentiment validation is outside this study's scope.
+
+\section{Experimental design}
+The five assignments are three homogeneous pairs---Qwen2.5-1.5B-Instruct, Qwen2.5-3B-Instruct, and SmolLM2-1.7B-Instruct---plus Qwen2.5-1.5B/SmolLM2 in both agent assignments.
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}p{3.2cm}X@{}}
+\toprule
+Factor & Conditions\\
+\midrule
+Scenario & Sensor; Storage\\
+Checkpoint assignment & Three homogeneous; two heterogeneous assignments\\
+Persona & Absent; present\\
+Initialization & Natural; forced A1--B2; forced A2--B1\\
+Schedule & Synchronous; A then B; B then A; no peer\\
+Choice procedure & Scored; generated\\
+\bottomrule
+\end{tabularx}
+\caption{Independent variables in the primary study: $2\times5\times2\times3\times4\times2=480$ conversations.}
+\end{table}
+
+The primary study contains 360 interactive and 120 no-peer conversations. Each has initialization and at most 15 update rounds. Dependent measures include public choices, margins, stance, switching, agreement, recurrence, and stopping time. Histories and explanations evolve during interaction; they are not independently assigned factors. Each condition has one greedy trajectory.
+
+Two additional sets each contain 120 conversations, restricted to natural starts and the three interactive schedules. The \textbf{fixed-horizon set} records stopping triggers but continues through round 15. The \textbf{reversed-presentation set} reverses both the initial alternative display and complete candidate blocks while preserving semantic strategy identities. Together with the primary study, this gives 720 configured conversations. The separate 12-conversation smoke test checks execution and is excluded from study summaries.
+
+\section{Adaptive termination}
+After every complete update round $t\geq1$, stopping requires all agents to satisfy
+\[
+d_i^t=d_i^{t-1},\qquad
+\mathbf{1}[m_{i,\mathrm{post}}^t\geq0]=\mathbf{1}[m_{i,\mathrm{post}}^{t-1}\geq0],\qquad
+\cos\!\left(e(M_i^t),e(M_i^{t-1})\right)\geq0.8.
+\]
+Both choices must be valid. There is no minimum-round gate or margin-magnitude tolerance. The system can stop in stable disagreement. Otherwise, it stops at the maximum. The reason is recorded as system-detected stability or maximum rounds; agents do not issue stopping commands.
+
+The encoder is \texttt{sentence-transformers/all-MiniLM-L6-v2}, pinned to revision \texttt{1110a243fdf4706b3f48f1d95db1a4f5529b4d41}. Full messages include endorsements. Long inputs are encoded in chunks, combined by token-weighted mean, and normalized. The threshold is an engineering setting. The fixed-horizon comparison measures potential rounds and generated tokens saved, and whether later choices change. Token savings exclude scoring and embedding overhead.
+
+\section{Separate controls and analysis}
+Message/history controls use available rounds 1 and 2 from both agents in natural, synchronous primary conversations. Conversations containing invalid generated choices are excluded. Each context produces eight branches: full or removed prior assistant history crossed with full peer message, endorsement only, explanation only, or no current message. These branches rescore the margin without continuing the conversation. Up to 160 contexts yield 1,280 evaluations. Scenario and persona remain fixed. Explanation-only text may still express a position.
+
+Every conversation job exports stance, sentiment, public-choice, and raw-margin trajectories through its actual endpoint. Aggregate plots show outcomes by condition, lengths and stopping reasons, switches, observed conversation counts, and explanation similarity. Separate jobs export control effects and matched fixed-horizon/presentation comparisons. Stopped trajectories are not padded. Agreement at termination is distinguished from agreement at a common horizon.
+
+\section{Measurement checks and limits}
+Experiment D provides separate measurement checks on 384 post-response contexts: replay and repeated scoring reproduced every margin exactly, length normalization preserved every preferred strategy, and reversed strategy blocks preserved preference in 275 contexts (71.6\%). This supports numerical reproducibility while identifying presentation dependence. Stance is interpreted conditional on the specified candidates, prompt, and history.
+
+The study covers two tradeoffs and three small checkpoints. Generated-output failures, fixed role assignments, and response-format differences limit interpretation. Repetition and stable signs do not guarantee that further exchange cannot change a choice. Rounds and agents within a conversation are dependent observations; aggregate response counts are not independent sample sizes. Control removals measure effects of defined context changes, not a complete decomposition of persuasion.
+
+\end{document}

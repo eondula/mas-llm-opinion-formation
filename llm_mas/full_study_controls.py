@@ -20,12 +20,10 @@ def branches(row):
                 for d in deliveries:
                     message=d['message']
                     # Saved structured generated messages; forced/scored messages have a fixed first line.
-                    try:
-                        data=json.loads(message)
-                    except ValueError:data=None
-                    if isinstance(data,dict) and type(data.get('strategy')) is int and isinstance(data.get('explanation'),str):
-                        endorsement=f'Strategy {data["strategy"]}'
-                        explanation=data['explanation']
+                    from .choice_output import parse
+                    strategy, explanation, status = parse(message)
+                    if status == 'valid':
+                        endorsement=f'Strategy {strategy}'
                     else:
                         endorsement,_,explanation=message.partition('\n')
                     text=message if component=='full' else endorsement if component=='endorsement' else explanation

@@ -19,6 +19,12 @@ class FullStudyTests(unittest.TestCase):
         self.assertEqual(parse('{"strategy":1,"explanation":"yes"}')[0],1)
         for s in ['A','{"strategy":true,"explanation":"yes"}','{"strategy":3,"explanation":"yes"}']:
             self.assertIsNone(parse(s)[0])
+    def test_fenced_json_and_malformed_json(self):
+        text='{"strategy":1,"explanation":"Reason."}'
+        self.assertEqual(parse('```json\n'+text+'\n```'),(1,'Reason.','valid'))
+        self.assertIsNone(parse('```json\n'+text+'"\n```')[0])
+        self.assertIsNone(parse(text+' extra')[0])
+
     def test_generated_choice_not_overridden_by_margin(self):
         c=resolve(dict(rounds=1,argument_mode='combined_reasoning',decision_mode='generated'))
         rows=conversation(c,c['scenarios'][0],templates(),{c['models'][0]:Runtime()})
