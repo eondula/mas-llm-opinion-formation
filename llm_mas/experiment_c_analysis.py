@@ -3,11 +3,53 @@ import csv
 import hashlib
 import json
 import math
+import time
 from collections import defaultdict
 from pathlib import Path
 
 from .runner import write
 
+
+
+def duration(seconds):
+    if seconds is None:
+        return 'estimating'
+    seconds = max(0, int(seconds))
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+    return f'{hours:02d}:{minutes:02d}:{seconds:02d}'
+
+
+class AnalysisProgress:
+    """Unique replay rows are units; completed layers give fractional row progress.
+
+    ETA extrapolates elapsed wall time and is approximate across models/contexts.
+    """
+    def __init__(self, path, total, stage, clock=time.monotonic):
+        self.path, self.total, self.stage = path, total, stage
+        self.clock = clock
+        self.started = clock()
+        self.completed = 0.0
+
+    def update(self, phase, completed=None, detail='', **extra):
+        if completed is not None:
+            self.completed = max(self.completed, min(self.total, completed))
+        elapsed = self.clock() - self.started
+        fraction = self.completed / self.total if self.total else 0.0
+        if phase == 'complete':
+            fraction = 1.0
+            self.completed = self.total
+        eta = elapsed * (1-fraction)/fraction if 0 < fraction < 1 else 0 if fraction == 1 else None
+        state = dict(phase=phase, stage=self.stage, elapsed_seconds=elapsed,
+                     estimated_remaining_seconds=eta, overall_fraction=fraction,
+                     completed_units=self.completed, total_units=self.total,
+                     detail=detail, updated_at=time.time(), **extra)
+        write(self.path, state)
+        filled = int(24*fraction)
+        bar = '#' * filled + '-' * (24-filled)
+        print(f'[{bar}] {100*fraction:5.1f}% | elapsed {duration(elapsed)} | '
+              f'ETA ~{duration(eta)} | {phase}: {detail}', flush=True)
+        return state
 
 def csv_write(path, rows):
     if not rows:
@@ -119,7 +161,7 @@ def within_plot(root, case, records):
     csv_write(root/'tables'/f"{case['id']}_within_step.csv", data)
 
 
-def replay_row(runtime, row, scenario, tolerance=.01):
+def replay_row(runtime, row, scenario, tolerance=.01, on_layer=None):
     """Independent residual-output patches from before into after peer delivery."""
     from .interventions import replacement
     after = row['decision_history']
@@ -177,7 +219,10 @@ def replay_row(runtime, row, scenario, tolerance=.01):
             patched_margin=patched, delta=patched-baseline['margin'],
             choice_flip=(patched>=0)!=(baseline['margin']>=0), self_patch_error=self_margin-baseline['margin'],
             donor_position=positions[0], recipient_position=positions[1], anchor='final_prompt_token', component='block_residual_output'))
-        print(f"  {row['agent']} round {row['round']} layer {layer+1}/{len(blocks)}", flush=True)
+        if on_layer:
+            on_layer(layer+1, len(blocks))
+        else:
+            print(f"  {row['agent']} round {row['round']} layer {layer+1}/{len(blocks)}", flush=True)
     return results
 
 
@@ -235,13 +280,22 @@ def execute(root, stage='behavioral', device='auto', tolerance=.01):
         note='Observational activation change; causal patch effect at one token site, not a decomposition or sentiment intervention. No dialogue continuation. Forced round zero has no decision score.')
     write(root/'tables/analysis_manifest.json',manifest)
     csv_write(root/'tables/analysis_selection.csv',selection)
+    unique_rows = {(task, row['agent'], row['round'])
+                   for case in cases for task in case['tasks'] for row in records[task]['rows']
+                   if row['round'] > 0 and row.get('deliveries')}
+    total = len(cases) + (len(unique_rows) if stage == 'all' else 0)
+    progress = AnalysisProgress(root/'tables/analysis_status.json', total, stage)
+    progress.update('starting', detail=f'{len(cases)} cases; {len(unique_rows) if stage == "all" else 0} unique replay updates')
     cache = {}
     runtime = None
+    completed = 0
     try:
         for case in cases:
             print(f"{case['id']}: {case['reason']} ({', '.join(case['tasks'])})",flush=True)
             within_plot(root,case,records)
             if stage != 'all':
+                completed += 1
+                progress.update('figures', completed, case['id'])
                 continue
             data = []
             for task in case['tasks']:
@@ -255,15 +309,25 @@ def execute(root, stage='behavioral', device='auto', tolerance=.01):
                             # Grouping is deliberately unnecessary for correctness; release old weights.
                             if runtime is not None:
                                 del runtime
+                            progress.update('loading', detail=f"{case['id']} · {row['model']}")
                             from .runtime import Runtime
                             runtime=Runtime(row['model'],device)
-                        cache[key]=[dict(task=task,**d) for d in replay_row(runtime,row,rec['scenario'],tolerance)]
+                        label = f"{case['id']} · {task} · {row['agent']} · round {row['round']}"
+                        progress.update('replay', detail=label+' · baseline and activation capture')
+                        def on_layer(done, total_layers):
+                            progress.update('replay', completed + done/total_layers,
+                                            label+f' · layer {done}/{total_layers}')
+                        cache[key]=[dict(task=task,**d) for d in replay_row(runtime,row,rec['scenario'],tolerance,on_layer)]
+                        completed += 1
                     data.extend(cache[key])
             csv_write(root/'tables'/f"{case['id']}_layers.csv",data)
+            progress.update('figures', detail=case['id'])
             heatmaps(root,case,records,data)
-        write(root/'tables/analysis_status.json',dict(phase='complete',stage=stage,cases=len(cases)))
+            completed += 1
+            progress.update('figures', completed, case['id'])
+        progress.update('complete', total, cases=len(cases))
     except BaseException as error:
-        write(root/'tables/analysis_status.json',dict(phase='failed',error=str(error)))
+        progress.update('cancelled' if isinstance(error, KeyboardInterrupt) else 'failed', error=str(error))
         raise
     print(f"Analysis complete: {root/'figures'}",flush=True)
     return cases

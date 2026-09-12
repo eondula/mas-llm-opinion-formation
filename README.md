@@ -308,3 +308,17 @@ The analysis manifest records source conversation hashes and the protocol.
 All-layer analysis can be expensive: each selected update requires independent
 candidate scoring for every patch and self-patch. Progress prints per layer.
 Rerunning recomputes analysis and replaces only its prefixed exports.
+
+`analyze-c` prints a progress bar, elapsed time, and an approximate remaining
+ETA after each layer. Each unique agent/round replay is one work unit, subdivided
+by its layer count; each case's figure export is another unit. Reused replay rows
+are not counted twice. ETA starts as `estimating` and extrapolates elapsed wall
+time, so it can change substantially with longer histories, other checkpoints,
+and model-loading delays. It is not a GPU benchmark or a guaranteed finish time.
+The same values are saved to `tables/analysis_status.json`, including during
+loading, completion, cancellation, and failure. Background logs contain one
+readable line per update rather than terminal control characters.
+
+Pulling updated code does not add progress reporting to an already-running
+Python process. Existing jobs can finish normally; a newly started job uses the
+new reporting. This analysis does not yet resume partially completed replay work.

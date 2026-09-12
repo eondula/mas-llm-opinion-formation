@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from llm_mas.experiment_c_analysis import execute, select_cases, switches, replay_row, heatmaps
+from llm_mas.experiment_c_analysis import execute, select_cases, switches, replay_row, heatmaps, AnalysisProgress
 from test_interventions import Tiny, Block
 
 
@@ -19,6 +19,25 @@ def record(schedule='synchronous'):
 
 
 class AnalysisTests(unittest.TestCase):
+    def test_progress_timing_and_terminal_states(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            now = [100.0]
+            path = Path(tmp)/'status.json'
+            progress = AnalysisProgress(path, 4, 'all', clock=lambda: now[0])
+            initial = progress.update('starting')
+            self.assertIsNone(initial['estimated_remaining_seconds'])
+            now[0] = 120
+            partial = progress.update('replay', 1)
+            self.assertEqual(partial['elapsed_seconds'], 20)
+            self.assertEqual(partial['estimated_remaining_seconds'], 60)
+            self.assertEqual(progress.update('loading', 0)['overall_fraction'], .25)
+            failed = progress.update('failed', error='test')
+            self.assertEqual(failed['elapsed_seconds'], 20)
+            self.assertEqual(json.loads(path.read_text())['error'], 'test')
+            done = progress.update('complete')
+            self.assertEqual(done['overall_fraction'], 1)
+            self.assertEqual(done['estimated_remaining_seconds'], 0)
+
     def test_selection_and_forced_switch(self):
         a=record();b=record('sequential')
         for r in b['rows']:
@@ -52,7 +71,9 @@ class AnalysisTests(unittest.TestCase):
         scenario={'strategy_1':{'candidate':'AB'},'strategy_2':{'candidate':'BA'}}
         measurement=runtime.measure(history,scenario,{'stance_probe':'A or B?'})
         row=dict(agent='Agent A',round=1,decision_history=history,deliveries=[{}],decision=measurement)
-        results=replay_row(runtime,row,scenario,1e-5)
+        callbacks=[]
+        results=replay_row(runtime,row,scenario,1e-5,lambda done,total:callbacks.append((done,total)))
+        self.assertEqual(callbacks,[(1,2),(2,2)])
         self.assertEqual([r['layer'] for r in results],[0,1])
         self.assertTrue(all(abs(r['self_patch_error'])<1e-5 for r in results))
         self.assertTrue(all(r['activation_change']>=0 for r in results))
