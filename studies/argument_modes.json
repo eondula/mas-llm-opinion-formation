@@ -1,0 +1,20 @@
+{
+  "mode": "study",
+  "models": [
+    "Qwen/Qwen2.5-1.5B-Instruct"
+  ],
+  "agents": 2,
+  "scenarios": [
+    "storage"
+  ],
+  "rounds": 20,
+  "initialization": "natural",
+  "schedule": "synchronous",
+  "grid": {
+    "argument_mode": [
+      "predefined",
+      "agent_selected",
+      "generated"
+    ]
+  }
+}

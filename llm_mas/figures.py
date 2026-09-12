@@ -4,6 +4,11 @@ import json
 from pathlib import Path
 
 def render(path):
+    path = Path(path)
+    if (path/'config.json').exists() and json.loads((path/'config.json').read_text()).get('export_profile') == 'experiment_c':
+        from .experiment_c import export
+        return export(path)
+
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -50,6 +55,8 @@ def render(path):
         fig.suptitle(title,fontsize=11)
         if not any('sentiment' in r for r in rows): axes[1].text(.5,.5,'Sentiment not measured',transform=axes[1].transAxes,ha='center')
         for f,stem in [(fig,source.stem+'_stance_sentiment'),(deltafig,source.stem+'_absolute_changes')]:
+            from .plot_data import export as export_plot_data
+            export_plot_data(f,folder/(stem+'.csv'))
             for ext in ('png','pdf'):
                 filename=f'{stem}.{ext}'; f.savefig(folder/filename,dpi=180); files.append(filename)
             plt.close(f)
@@ -73,6 +80,8 @@ def render(path):
             ax.set_xticks([0,1,2,3],['Self 1 / peer 1','Self 1 / peer 2','Self 2 / peer 1','Self 2 / peer 2'])
         ax.set_ylabel('Raw margin' if source.stem=='validation' else 'Peer-associated margin change')
         ax.axhline(0,color='gray',linewidth=.8); ax.legend(fontsize=8)
+        from .plot_data import export as export_plot_data
+        export_plot_data(fig,folder/(source.stem+'.csv'))
         for ext in ('pdf','png'): fig.savefig(folder/(source.stem+'.'+ext),dpi=180)
         research_files.append(source.stem)
         plt.close(fig)

@@ -1,0 +1,20 @@
+Choose a strategy and explain your choice using the provided arguments.
+
+Respond to the latest peer reasoning when available; otherwise, give
+your own rationale. You may combine and rephrase arguments and acknowledge
+tradeoffs. Avoid unnecessary repetition and do not introduce new facts.
+
+STRATEGY 1
+Candidate:
+{candidate_1}
+Arguments:
+{arguments_1}
+
+STRATEGY 2
+Candidate:
+{candidate_2}
+Arguments:
+{arguments_2}
+
+
+Return the exact candidate statement, followed by your explanation.

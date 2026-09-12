@@ -95,3 +95,157 @@ The raw margin is candidate 1 log-likelihood minus candidate 2 log-likelihood. T
 Group trajectory prediction currently covers two agents only. No dedicated no-history conversation control is implemented. Validation focuses on initial contexts; label, formatting and attribution robustness are incomplete. Internal analyses use selected events and supported model components; sufficiency matching can find no eligible pair. Export coverage does not guarantee complete research coverage. A full real-checkpoint study remains to be validated.
 
 The dashboard license is in `dashboard/LICENSE`; no project-wide license has been selected.
+
+### Analyze saved runs
+
+Open **Analyze saved runs** in the dashboard navigation (`/analyze.html`). Select a saved conversation, optionally select a second run/conversation with the same scenario, then choose **Create analysis**. With no additional analyses checked, this exports the study's conversation figures and tables without loading models. It also reuses available saved measurements for that conversation. Each figure has PNG/PDF and plotted-data CSV downloads; tables have full CSV downloads and a 20-row preview.
+
+For new replay or mechanistic measurements, select an agent/round with peer delivery. The dashboard automatically sweeps all layers. Patches stay within the receiver checkpoint. Continuation repeats the intervention separately at each layer, replays the conversation, and checks the history before intervention. These options require fresh model inference and can be slow. They do not rerun the study grid. New outputs are stored under a separate run ID with source hashes and provenance; original runs are unchanged.
+
+Comparisons align agent labels and shared rounds, export both trajectories and B-minus-A margins, and include checkpoint/condition metadata. They are descriptive comparisons, not controlled causal estimates. A quick-preview analysis does not supply missing validation or prediction experiments automatically.
+
+The same workflow can run from the terminal:
+
+```sh
+.venv/bin/python -m llm_mas analyze --config analysis_request.json --run-id preview_analysis
+```
+
+Example `analysis_request.json` (replace IDs and task with saved values):
+
+```json
+{
+  "source_run": "Test_5",
+  "task": "000_000",
+  "modules": ["mechanistic"],
+  "agent": "Agent A",
+  "round": 1,
+  "device": "auto"
+}
+```
+
+Set `modules` to `[]` for exports only. Add `compare_run` and `compare_task` for a two-conversation comparison. Available modules are `replay`, `mechanistic`, `heads`, `source_spans`, and `continuation`.
+
+### Custom Quick preview scenarios
+
+In the dashboard, click **Create scenario**. Enter an ID and title, then each strategy's name, two properties, candidate statement, and arguments (one per line). **Fill from selected scenario** provides an editable example. **Save and select scenario** validates the form, saves it under `scenarios/custom/`, and selects it for the next run. Existing files are never overwritten.
+
+From the terminal, create an editable template, edit its JSON fields, validate, and run:
+
+```sh
+.venv/bin/python -m llm_mas scenarios create --template storage --output scenarios/custom/my_scenario.json
+# Edit scenarios/custom/my_scenario.json with your scenario and both strategies.
+.venv/bin/python -m llm_mas scenarios validate --file scenarios/custom/my_scenario.json
+.venv/bin/python -m llm_mas preview --scenario scenarios/custom/my_scenario.json --rounds 5
+```
+
+The filename supplies the default scenario ID; `--id` overrides it. IDs allow letters, digits, underscores, and hyphens. Each strategy needs nonempty `name`, `property_1`, `property_2`, `candidate`, and an `arguments` list with at least one nonempty string. The two candidate statements must differ.
+
+### Agent-selected arguments
+
+Three argument modes are available in quick preview and study conditions:
+
+- `predefined`: existing cyclic assignment from each strategy's ordered list.
+- `agent_selected`: after choosing a strategy, the model scores the numbers of that strategy's listed arguments under a separate selection prompt and its current history. The highest-likelihood number determines which exact argument is communicated. The instruction requests a response to the latest peer reasoning from the fixed list, preferring relevant development over repetition. Without peer messages it requests an independent rationale. Text is used verbatim: no rewriting or combining. Repeated choices are allowed when relevant; ties use the first entry. List order/number labels may affect selection and should be counterbalanced when studying argument choice.
+- `generated`: existing freely generated argument for the selected strategy.
+
+The selection prompt/list is not appended to conversation history. Only the candidate plus selected argument is appended and delivered. Saved response rows contain a zero-based `argument_index` and, for agent selection, `argument_selection` with the prompt, rendered prompt, labels, scores and chosen number. Stance scoring is unchanged. This deterministic constrained selection requires one extra likelihood pass per argument, so it is slower than cyclic assignment. Existing reports describe the original modes, not this new condition.
+
+```sh
+python -m llm_mas preview --scenario storage --argument-mode agent_selected --rounds 3 --run-id selected_preview
+python -m llm_mas study --config studies/argument_modes.json --run-id argument_comparison
+```
+
+In the dashboard choose **Conversational (fixed list)** under **Arguments**. For studies, uncheck the paper suite to use this setting or specify `argument_mode` in the condition list. The original paper-suite preset remains unchanged for reproducibility; `studies/argument_modes.json` is a separate three-mode comparison.
+
+### Conversational arguments
+
+Select **Conversational (generated)** in the dashboard or use `--argument-mode conversational`.
+The decision margin still selects the strategy (except assigned initialization).
+One generation call then produces an argument responding to the latest delivered
+peer messages. At initialization and in no-peer control, it instead requests an
+independent rationale. The canonical candidate remains the public-message prefix.
+Repetition avoidance and scenario consistency are instructions, not enforced guarantees.
+The generation instruction is saved in each row's `generation.instruction`; it is
+not appended to retained history. Normal schedule and history rules still apply.
+
+```sh
+python -m llm_mas preview --scenario storage --argument-mode conversational --rounds 3
+```
+
+Study JSON accepts `"argument_mode": "conversational"` at the top level, in explicit
+conditions, or in the argument-mode grid. Use selected conditions with the dashboard
+paper suite unchecked; existing study presets retain their original conditions.
+
+### Combined prompt with fixed argument texts
+
+`combined_fixed` / **Combined prompt (fixed list)** includes both candidate statements
+and both argument pools in one decision instruction. The candidate-only likelihood
+margin selects the strategy. Each actual argument of that strategy is then scored
+as a continuation of the selected candidate plus a newline under the same prompt.
+Only argument-token log-likelihoods enter this second ranking; scores are summed
+without length normalization. Exact selected text is appended to history. No argument
+numbers or second user instruction are used. Repetition is discouraged, not forbidden.
+
+Both pools are visible in before/decision/post stance probes, including natural
+initialization. This is a different measurement context from the other modes. Forced
+initialization still assigns the strategy. Selection scores, token counts, prompt,
+and continuation prefix are saved. List ordering, wording, and argument length may
+influence selection. Saved-history replay/interventions use the condition's probe.
+
+```sh
+python -m llm_mas preview --scenario storage --argument-mode combined_fixed --rounds 3
+```
+
+Study configurations and condition grids accept `"argument_mode": "combined_fixed"`.
+For dashboard studies, uncheck the original paper suite to use this mode. Existing
+study presets and historical results are unchanged.
+
+### Combined prompt with flexible reasoning
+
+Use `combined_reasoning` / **Combined prompt (flexible reasoning)** to let agents
+combine and rephrase any number of the provided reasons. Both lists appear in the
+shared stance/response prompt. The stance margin selects the strategy; the model
+then generates the explanation as a continuation of that candidate, with no second
+instruction and no per-argument scoring. Forced initialization remains assigned.
+The instruction permits acknowledging the other strategy's benefits while explaining
+the selected choice. Grounding and avoiding repetition are encouraged, not enforced.
+There is no argument-count limit, but `max_argument_tokens` still bounds generation.
+The explanation is stored in `argument`, with generation metadata and the exact
+instruction; `argument_index` and `argument_selection` are null.
+
+```sh
+python -m llm_mas preview --scenario storage --argument-mode combined_reasoning --rounds 3
+```
+
+Study JSON accepts `"argument_mode": "combined_reasoning"`, including condition grids.
+Uncheck the dashboard paper suite to use selected settings. `combined_fixed` remains
+the separate exact-single-argument condition, so earlier configurations are not relabeled.
+
+### Experiment C
+
+```sh
+python -m llm_mas study --config studies/experiment_C.json --dry-run
+python -m llm_mas study --config studies/experiment_C.json --run-id experiment_C
+```
+
+Defaults: Sensor and Storage, two agents, natural and forced A:S1/B:S2 starts, 20 update rounds,
+combined flexible reasoning, synchronous and forward sequential only. Each of the
+three checkpoints runs as a homogeneous pair. Exactly one heterogeneous assignment
+runs: Agent A = Qwen2.5-1.5B-Instruct; Agent B = SmolLM2-1.7B-Instruct. No reversed
+assignment or other mixed combinations are included. Total: 32 conversations.
+
+Dashboard: select **Experiment C** in Run mode. Scenarios, rounds and maximum
+argument tokens remain editable; agent assignments, starts, schedules and argument
+mode are fixed by the preset. Other study settings are ignored for this preset.
+
+For each scenario, `figures/` contains eight PNGs (four per initialization): homogeneous synchronous,
+homogeneous sequential, heterogeneous synchronous, heterogeneous sequential. Each
+homogeneous figure has three model rows, with post-response stance on the left and
+public-message sentiment on the right. Heterogeneous figures have one row showing
+the fixed pair. No PDFs are generated. `tables/homogeneous_summary.csv` and
+`tables/heterogeneous_summary.csv` contain per-conversation outcomes, agreement timing,
+agent checkpoints, initial/final strategies, decision-switch counts, final decision
+and post-response margins, final stance/sentiment and repeated-message counts.
+Stable agreement is measured only through the observed final round. Raw histories
+and generation metadata remain in conversation JSON. The dashboard's saved-figures
+page and ZIP download include the PNGs and summary CSVs.

@@ -1,0 +1,9 @@
+Your selected strategy is:
+{candidate}
+
+Choose exactly one argument from the fixed list below to communicate for this strategy in the current conversation.
+If peer messages are present, choose the argument that best addresses a reason or tradeoff in the latest peer messages. Do not merely echo a peer's conclusion. Prefer a relevant argument that develops the exchange rather than repeating your own earlier reasons. You may repeat an argument when it remains the most relevant response; do not choose an irrelevant argument solely to avoid repetition.
+If no peer messages are present, choose the argument that best explains your own selected strategy without assuming that a peer has spoken.
+Use only the listed arguments. Do not rewrite, combine, or invent arguments, and do not change the selected strategy. Return only its number.
+
+{arguments}

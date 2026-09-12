@@ -1,9 +1,9 @@
 const $=id=>document.getElementById(id);let catalog=[],events=[],lastIndex=0;
 async function api(path,data){const r=await fetch('/api/'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{});const v=await r.json();if(!r.ok)throw Error(v.error);return v;}
 function config(){return {paper_suite:$('mode').value==='study'&&$('paper-suite').checked,run_id:$('run-id').value.trim()||undefined,mode:$('mode').value,agents:Number($('agents').value),agent_configuration:$('agent-configuration').value,models:$('models').value.split('\n').map(s=>s.trim()).filter(Boolean),scenarios:[...$('scenarios').selectedOptions].map(o=>o.value),rounds:Number($('rounds').value),initialization:$('initialization').value==='natural'?'natural':[...$('forced-strategies').querySelectorAll('select')].map(el=>Number(el.value)),schedule:$('schedule').value,argument_mode:$('argument_mode').value,max_argument_tokens:Number($('max_argument_tokens').value),research:$('mode').value==='study'?[...document.querySelectorAll('[name=research]:checked')].map(x=>x.value):[],conditions:$('mode').value==='study'&&$('conditions').value.trim()?JSON.parse($('conditions').value):[]};}
-async function load(){catalog=await api('scenarios');$('scenarios').replaceChildren();for(const e of catalog){const o=new Option(e.data.title,e.path);o.selected=e.path.endsWith('/storage.json')||($('mode').value==='study'&&e.path.endsWith('/sensor.json'));$('scenarios').add(o);}}
+async function load(){catalog=await api('scenarios');$('scenarios').replaceChildren();for(const e of catalog){const o=new Option(e.data.title,e.path);o.selected=e.path.endsWith('/storage.json')||($('mode').value!=='preview'&&e.path.endsWith('/sensor.json'));$('scenarios').add(o);}}
 function safe(fn){return async()=>{try{$('error').textContent='';await fn();}catch(e){$('error').textContent=e.message;}};}
-$('mode').onchange=()=>{$('agents').disabled=false;$('scenarios').multiple=$('mode').value==='study';safe(load)();};$('mode').onchange();
+$('mode').onchange=()=>{$('agents').disabled=false;$('scenarios').multiple=$('mode').value!=='preview';safe(load)();};$('mode').onchange();
 function startingControls(){const box=$('forced-strategies'),previous=[...box.querySelectorAll('select')].map(el=>el.value);box.hidden=$('initialization').value!=='forced';box.replaceChildren();for(let i=0;i<Number($('agents').value);i++){const label=document.createElement('label');label.textContent=i<26?`Agent ${String.fromCharCode(65+i)}`:`Agent ${i+1}`;const select=document.createElement('select');select.id='forced-'+i;label.htmlFor=select.id;select.add(new Option('Strategy 1','1'));select.add(new Option('Strategy 2','2'));select.value=previous[i]||(i===0?'2':'1');box.append(label,select);}}
 $('initialization').onchange=startingControls;$('agents').onchange=()=>{startingControls();modelControls();draw(lastIndex);};const modeChange=$('mode').onchange;$('mode').onchange=()=>{modeChange();startingControls();};startingControls();
 $('preview-prompts').onclick=safe(async()=>{const dialog=$('prompt-dialog');$('prompt').textContent='Loading configuration and prompts…';dialog.showModal();try{const result=await api('preview',config());$('prompt').textContent=JSON.stringify(result,null,2);}catch(error){$('prompt').textContent=error.message;throw error;}});
@@ -18,8 +18,28 @@ $('run').onclick=safe(async()=>{
  } catch(error){$('run').disabled=false;$('run-state').textContent='Unable to start';throw error;}
 });$('stop').onclick=safe(()=>api('stop',{}));
 $('close-prompt').onclick=()=>$('prompt-dialog').close();
-$('template').onclick=()=>{const e=catalog.find(e=>e.path===$('scenarios').value);if(e){const d=structuredClone(e.data);d.id='custom_scenario_001';$('scenario-editor').value=JSON.stringify(d,null,2);}};
-$('save-scenario').onclick=safe(async()=>{await api('scenarios',JSON.parse($('scenario-editor').value));await load();});
+$('new-scenario').onclick=()=>{$('scenario-error').textContent='';$('scenario-dialog').showModal();};
+$('close-scenario').onclick=()=>$('scenario-dialog').close();
+$('scenario-template').onclick=()=>{
+ const data=catalog.find(e=>e.path===$('scenarios').value)?.data;if(!data)return;
+ for(const input of $('scenario-form').querySelectorAll('[name]')){
+  const [key,field]=input.name.split('.');const value=field?data[key][field]:data[key];
+  input.value=key==='id'?'custom_'+Date.now():Array.isArray(value)?value.join('\n'):value;
+ }
+};
+$('scenario-form').onsubmit=async event=>{
+ event.preventDefault();const button=event.submitter;button.disabled=true;$('scenario-error').textContent='';
+ try{
+  const data={strategy_1:{},strategy_2:{}};
+  for(const input of $('scenario-form').querySelectorAll('[name]')){
+   const [key,field]=input.name.split('.');const value=input.value.trim();
+   if(field)data[key][field]=field==='arguments'?value.split('\n').map(x=>x.trim()).filter(Boolean):value;else data[key]=value;
+  }
+  const result=await api('scenarios',data);await load();
+  for(const option of $('scenarios').options)option.selected=option.value===result.saved;
+  $('scenario-dialog').close();$('error').textContent='';
+ }catch(error){$('scenario-error').textContent=error.message;}finally{button.disabled=false;}
+};
 
 let selectedTask=null, following=true, timer=null, currentRun=null, activeConfig=null, activeTasks=[], lastPhase=null;
 const names=[];
@@ -35,7 +55,7 @@ function updateHeading(){
  const scenario=activeConfig?.scenarios?.[scenarioIndex];
  const settings=activeTasks[conditionIndex]||{...activeConfig,...activeConfig?.conditions?.[conditionIndex]};
  $('title').textContent=scenario?.title||'Conversation in progress';
- $('description').textContent=[settings.schedule?.replaceAll('_',' '),settings.initialization==='natural'?'Natural start':settings.initialization?'Forced start':null,settings.argument_mode?settings.argument_mode+' arguments':null].filter(Boolean).join(' · ');
+ $('description').textContent=[settings.schedule?.replaceAll('_',' '),settings.initialization==='natural'?'Natural start':settings.initialization?'Forced start':null,settings.argument_mode?({predefined:'Predefined (cyclic)',agent_selected:'Conversational (fixed list)',combined_reasoning:'Combined prompt (flexible reasoning)',combined_fixed:'Combined prompt (fixed list)',generated:'Generated',conversational:'Conversational (generated)'}[settings.argument_mode]||settings.argument_mode)+' arguments':null].filter(Boolean).join(' · ');
 }
 function draw(index){
  updateHeading();
@@ -63,7 +83,7 @@ function draw(index){
  $('delivery').textContent='';$('delivery').hidden=true;
  chart('stance-chart',all.length?Object.fromEntries(names.map(name=>[name,all.filter(e=>e.row.agent===name).map(e=>e.row.post.stance)])):null,'Post-response stance');
  const sent=all.some(e=>typeof e.row.sentiment==='number');chart('sentiment-chart',sent?Object.fromEntries(names.map(name=>[name,all.filter(e=>e.row.agent===name).map(e=>e.row.sentiment)])):null,'Sentiment available after scoring');
- const legend=document.querySelector('.legend');legend.replaceChildren();names.forEach((name,i)=>{const span=document.createElement('span');span.textContent=name;span.style.color=['var(--a)','var(--b)','var(--c)'][i%3];legend.append(span);});
+ const legend=document.querySelector('.legend');legend.replaceChildren();names.forEach((name,i)=>{const span=document.createElement('span');span.textContent=name;span.style.color=['var(--plot-1)','var(--plot-2)','var(--plot-3)','var(--plot-4)'][i%4];legend.append(span);});
  requestAnimationFrame(drawLinks);
 }
 let arrowFrame=null,lastAnimatedDelivery=null;
@@ -113,7 +133,7 @@ function chart(container, trajectories, caption) {
   const n=Math.max(...names.map(k=>trajectories[k]?.length||0));const x=i=>l+i/Math.max(n-1,1)*(W-l-r),y=v=>t+(1-v)/2*(H-t-b);
   for(const v of [-1,0,1]){make('line',{x1:l,y1:y(v),x2:W-r,y2:y(v),stroke:'var(--edge)'});make('text',{x:l-9,y:y(v)+4,'text-anchor':'end','font-size':11,fill:'var(--muted)'},v);}
   const step=Math.max(1,Math.ceil((n-1)/8));for(let i=0;i<n;i++)if(i%step===0||i===n-1)make('text',{x:x(i),y:H-12,'text-anchor':'middle','font-size':11,fill:'var(--muted)'},i);
-  names.forEach((name,j)=>{const values=trajectories[name]||[],color=['var(--a)','var(--b)','var(--c)'][j%3];const points=values.map((v,i)=>`${x(i)},${y(v)}`).join(' ');make('polyline',{points,fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':j?'6 4':''});values.forEach((v,i)=>{const dot=make('circle',{cx:x(i),cy:y(v),r:3,fill:color});const title=document.createElementNS(ns,'title');title.textContent=`${name} · round ${i}: ${fmt(v)}`;dot.append(title);});});box.append(svg);
+  names.forEach((name,j)=>{const values=trajectories[name]||[],color=['var(--plot-1)','var(--plot-2)','var(--plot-3)','var(--plot-4)'][j%4];const points=values.map((v,i)=>`${x(i)},${y(v)}`).join(' ');make('polyline',{points,fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':['','6 4','2 3','9 3 2 3'][j%4]});values.forEach((v,i)=>{const dot=make('circle',{cx:x(i),cy:y(v),r:3,fill:color});const title=document.createElementNS(ns,'title');title.textContent=`${name} · round ${i}: ${fmt(v)}`;dot.append(title);});});box.append(svg);
 }
 
 api('runs').then(runs=>{for(const run of runs)$('saved-run').add(new Option(run,run));});$('saved-run').onchange=()=>{currentRun=null;events=[];poll();};
@@ -140,7 +160,7 @@ function syncModels(){
  const mixed=$('agent-configuration').value==='heterogeneous';
  const models=mixed?[...$('agent-models').querySelectorAll('select')].map(s=>s.value):[$('shared-model').value];
  $('models').value=models.join('\n');
- $('model-help').textContent=mixed?'Choose a different checkpoint for each agent. Up to three distinct models are available.':'All agents share this checkpoint and maintain separate histories.';
+ $('model-help').textContent=mixed?'Choose any available model for each agent. Models may repeat across agents, including groups of four or more.':'All agents share this checkpoint and maintain separate histories.';
 }
 function modelControls(){
  const available=['Qwen/Qwen2.5-1.5B-Instruct','Qwen/Qwen2.5-3B-Instruct','HuggingFaceTB/SmolLM2-1.7B-Instruct'];
@@ -157,3 +177,13 @@ function modelControls(){
 $('agent-configuration').onchange=modelControls;
 $('shared-model').onchange=syncModels;
 modelControls();
+
+// Experiment C fixes the comparison factors; other modes keep their controls.
+const previousExperimentModeChange = $('mode').onchange;
+$('mode').onchange = () => {
+ previousExperimentModeChange();
+ const fixed = $('mode').value === 'experiment_c';
+ $('experiment-c-help').hidden = !fixed;
+ for (const id of ['agents','agent-configuration','shared-model','initialization','schedule','argument_mode','paper-suite','conditions']) $(id).disabled = fixed;
+ for (const el of document.querySelectorAll('#agent-models select, #forced-strategies select, [name=research]')) el.disabled = fixed;
+};

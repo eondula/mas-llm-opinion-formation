@@ -1,0 +1,17 @@
+Choose your current strategy and one argument from its corresponding fixed list.
+Use the scenario and discussion above. If peer messages are present, choose an argument that addresses their latest reasoning. Otherwise, choose an argument explaining your own strategy. Avoid unnecessary repetition, but repeat an argument if it remains the most relevant response.
+Use the candidate statement and argument exactly as written. Do not rewrite, combine, or invent arguments. Do not introduce new facts or assumptions.
+
+STRATEGY 1
+Candidate:
+{candidate_1}
+Arguments:
+{arguments_1}
+
+STRATEGY 2
+Candidate:
+{candidate_2}
+Arguments:
+{arguments_2}
+
+Return only the exact candidate statement followed by a newline and the exact argument text. Do not return an argument number or a speaker label.

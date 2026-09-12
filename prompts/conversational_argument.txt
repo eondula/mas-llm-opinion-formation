@@ -1,0 +1,6 @@
+Your selected position is:
+{candidate}
+
+{reply_instruction}
+Explain why you choose this tradeoff in one or two sentences. If your position changed, explain the change using the discussion; otherwise develop your reason for retaining it. Avoid repeating your earlier reasons or merely echoing another agent. Add a relevant distinction or response when possible, but do not invent novelty or disagreement.
+Use only the scenario and discussion above. Do not introduce new facts or assumptions. Return only the argument, without repeating the position statement or adding a speaker label.

@@ -14,7 +14,7 @@ def replacement(module, position, vector):
     finally:handle.remove()
 
 
-def sweep(runtime, before, after, scenario, texts, layers=None):
+def sweep(runtime, before, after, scenario, texts, layers=None, on_layer=None):
     blocks=getattr(getattr(runtime.model,'model',None),'layers',None)
     if blocks is None:raise ValueError('Mechanistic adapter requires model.model.layers')
     selected=layers if layers is not None else range(len(blocks))
@@ -47,6 +47,7 @@ def sweep(runtime, before, after, scenario, texts, layers=None):
                         margin=score,baseline=base[recipient],donor_margin=base[donor],delta=score-base[recipient],
                         recovery=(score-base[recipient])/denominator if abs(denominator)>1e-8 else None,
                         position=positions[recipient],anchor='final_prompt_token'))
+        if on_layer:on_layer(layer)
     return records
 
 @contextmanager
@@ -61,7 +62,7 @@ def input_replacement(module, position, vector, head=None, head_dim=None):
     finally:handle.remove()
 
 
-def head_sweep(runtime,before,after,scenario,texts,layers=None):
+def head_sweep(runtime,before,after,scenario,texts,layers=None,on_layer=None):
     blocks=runtime.model.model.layers
     probe=texts['stance_probe'].format(candidate_1=scenario['strategy_1']['candidate'],candidate_2=scenario['strategy_2']['candidate'])
     contexts=[h+[{'role':'user','content':probe}] for h in (before,after)]
@@ -85,10 +86,11 @@ def head_sweep(runtime,before,after,scenario,texts,layers=None):
                 with input_replacement(projection,positions[recipient],vectors[donor],head,width//heads):
                     margin=runtime.measure((before,after)[recipient],scenario,texts)['margin']
                 effects.append(dict(layer=layer,head=head,recipient=recipient,margin=margin,baseline=base[recipient],delta=margin-base[recipient]))
+        if on_layer:on_layer(layer)
     return effects
 
 
-def source_span_sweep(runtime,before,after,scenario,texts,layers=None):
+def source_span_sweep(runtime,before,after,scenario,texts,layers=None,on_layer=None):
     """Zero residual outputs over peer-message token spans; not a head-path claim."""
     probe=texts['stance_probe'].format(candidate_1=scenario['strategy_1']['candidate'],candidate_2=scenario['strategy_2']['candidate'])
     h=after+[{'role':'user','content':probe}]
@@ -116,4 +118,5 @@ def source_span_sweep(runtime,before,after,scenario,texts,layers=None):
             try:margin=runtime.measure(after,scenario,texts)['margin']
             finally:handle.remove()
             effects.append(dict(layer=layer,span=span,token_indices=indices,baseline=baseline,margin=margin,delta=margin-baseline,intervention='zero_peer_span_residual'))
+        if on_layer:on_layer(layer)
     return effects

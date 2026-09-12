@@ -23,6 +23,19 @@ def serve(port=8766):
         def do_GET(self):
             try:
                 parsed=urlparse(self.path)
+                if parsed.path=='/api/analyses':
+                    from .saved_analysis import list_analyses
+                    proc=state['process']
+                    active=state['run_id'] if proc and proc.poll() is None else None
+                    return self.send({'analyses':list_analyses(),'active_run':active})
+                if parsed.path=='/api/analysis':
+                    from .saved_analysis import catalog
+                    name=parse_qs(parsed.query)['run_id'][0]
+                    result=catalog(name)
+                    proc=state['process'] if state['run_id']==name else None
+                    if proc and proc.poll() is not None and result['status'].get('phase') not in ('complete','failed','cancelled'):
+                        result['status']={'phase':'failed','error':f'Analysis process exited with code {proc.returncode}. See results/studies/configurations/{name}.log'}
+                    return self.send(result)
                 if parsed.path=='/api/runs':
                     return self.send([p.name for p in sorted((ROOT/'results/studies').glob('*')) if (p/'config.json').exists()])
                 if parsed.path.startswith('/results/'):
@@ -61,7 +74,7 @@ def serve(port=8766):
                     config=json.loads((p/'config.json').read_text()) if p and (p/'config.json').exists() else None
                     tasks=json.loads((p/'tasks.json').read_text()) if p and (p/'tasks.json').exists() else []
                     return self.send(dict(run_id=name,status=status,events=events,config=config,tasks=tasks,running=proc is not None and proc.poll() is None))
-                assets={'/':('dashboard/study.html','text/html'),'/study.js':('dashboard/study.js','text/javascript'),'/styles.css':('dashboard/styles.css','text/css'),'/study.css':('dashboard/study.css','text/css'),'/docs.html':('dashboard/docs.html','text/html')}
+                assets={'/site.css':('dashboard/site.css','text/css'),'/site.js':('dashboard/site.js','text/javascript'),'/analyze.html':('dashboard/analyze.html','text/html'),'/analyze.js':('dashboard/analyze.js','text/javascript'),'/analyze.css':('dashboard/analyze.css','text/css'),'/':('dashboard/study.html','text/html'),'/study.js':('dashboard/study.js','text/javascript'),'/styles.css':('dashboard/styles.css','text/css'),'/study.css':('dashboard/study.css','text/css'),'/docs.html':('dashboard/docs.html','text/html')}
                 if self.path in assets:
                     filename,mime=assets[self.path];return self.send((ROOT/filename).read_bytes(),mime)
                 return self.send({'error':'Not found'},status=404)
@@ -88,8 +101,21 @@ def serve(port=8766):
                 with lock:
                     proc=state['process']
                     if self.path=='/api/stop':
+                        if data.get('run_id') and data['run_id']!=state['run_id']:raise ValueError('This is not the active run managed by this dashboard')
                         if proc and proc.poll() is None:proc.send_signal(signal.SIGINT)
                         return self.send({'stopping':True})
+                    if self.path=='/api/analyze':
+                        if proc and proc.poll() is None:raise ValueError('A run or analysis is already active')
+                        from .saved_analysis import validate
+                        validate(data)
+                        name=resolve_run_id(data.pop('run_id',None))
+                        if run_path(name).exists():raise ValueError('Output ID already exists')
+                        path=ROOT/'results/studies/configurations'/f'{name}.json'
+                        write(path,data)
+                        with path.with_suffix('.log').open('w') as log:
+                            process=subprocess.Popen([sys.executable,'-m','llm_mas','analyze','--config',str(path),'--run-id',name],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT)
+                        state.update(process=process,run_id=name)
+                        return self.send({'run_id':name})
                     if self.path=='/api/run':
                         if proc and proc.poll() is None:raise ValueError('A run is already active')
                         config=resolve(data)

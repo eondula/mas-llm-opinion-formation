@@ -13,7 +13,7 @@ def main():
     preview.add_argument('--agent-configuration',choices=['homogeneous','heterogeneous'])
     preview.add_argument('--scenario',default='storage')
     preview.add_argument('--rounds',type=int,default=20)
-    preview.add_argument('--argument-mode',choices=['predefined','generated'],default='predefined')
+    preview.add_argument('--argument-mode',choices=['predefined','agent_selected','generated','conversational','combined_fixed','combined_reasoning'],default='predefined')
     preview.add_argument('--initialization',default='natural',help='natural or comma-separated 1,2')
     preview.add_argument('--schedule',default='synchronous',choices=['synchronous','sequential','reverse_sequential','no_peer'])
     preview.add_argument('--device',default='auto',choices=['auto','cpu','cuda','mps'])
@@ -22,22 +22,29 @@ def main():
         if parser != preview: parser.add_argument('--config',required=True,help='JSON configuration')
         parser.add_argument('--run-id')
         parser.add_argument('--dry-run',action='store_true')
+    analyze=sub.add_parser('analyze');analyze.add_argument('--config',required=True);analyze.add_argument('--run-id',required=True)
     resume=sub.add_parser('resume');resume.add_argument('--run-id',required=True)
     figures=sub.add_parser('figures');figures.add_argument('--run-id',required=True)
     dashboard=sub.add_parser('dashboard');dashboard.add_argument('--port',type=int,default=8766)
     scenarios=sub.add_parser('scenarios');scenarios.add_argument('action',choices=['list','create','validate'])
-    scenarios.add_argument('--template',default='storage');scenarios.add_argument('--output');scenarios.add_argument('--file')
+    scenarios.add_argument('--id',help='ID for a new scenario');scenarios.add_argument('--template',default='storage');scenarios.add_argument('--output');scenarios.add_argument('--file')
     args=p.parse_args()
+    if args.command=='analyze':
+        from .saved_analysis import execute
+        return execute(json.loads(Path(args.config).read_text()),args.run_id)
     if args.command=='dashboard':
         from .web import serve
         return serve(args.port)
     if args.command=='scenarios':
         if args.action=='list':
-            for f in (ROOT/'scenarios/controlled').glob('*.json'):
-                if f.name!='index.json': print(f.stem)
+            for f in sorted((ROOT/'scenarios').glob('*/*.json')):
+                if f.name!='index.json': print(f.relative_to(ROOT))
         elif args.action=='create':
             if not args.output: p.error('--output required')
-            data=scenario(args.template);data['id']='custom_scenario_001'
+            template=scenario(args.template)
+            data={k:template[k] for k in ('title','strategy_1','strategy_2')}
+            data['id']=args.id or Path(args.output).stem
+            validate_scenario(data)
             target=Path(args.output);target.parent.mkdir(parents=True,exist_ok=True)
             with target.open('x') as out: json.dump(data,out,indent=2)
         else:

@@ -6,11 +6,12 @@ validation is made from the public choice constructed by the response policy.
 from copy import deepcopy
 from itertools import product
 import json
-from .prompts import initial
+from .prompts import initial, for_condition
 from .runner import write
 
 
-def run(path, config, texts, runtimes, progress):
+def run(path, config, texts, runtimes, progress, layer_progress=None):
+    base_texts = texts
     modules = [m for m in config.get('research', []) if m != 'prediction']
     unknown = set(modules)-{'validation','history','replay','mechanistic','heads','source_spans','continuation','sufficiency'}
     if unknown: raise ValueError(f'Unsupported research modules: {sorted(unknown)}')
@@ -21,11 +22,25 @@ def run(path, config, texts, runtimes, progress):
             results=[]
             for source in sorted((path/'conversations').glob('*.json')):
                 record=json.loads(source.read_text());scenario=record['scenario']
+                texts=for_condition(base_texts, record['config'], scenario)
                 eligible=[r for r in record['rows'] if r['round']>0 and r.get('deliveries')]
+                selection=config.get('research_selection')
+                if selection:
+                    eligible=[r for r in eligible if r['agent']==selection['agent'] and r['round']==selection['round']]
                 # Select by chronological order, not by patch outcome.
                 for row in eligible[:config.get('research_events_per_conversation',2)]:
+                    progress(module,row['model'],scenario['id']) if config.get('research_selection') else None
                     runtime=runtimes[row['model']]
                     history=row['decision_history'];before=history[:-len(row['deliveries'])]
+                    layer_options={}
+                    if layer_progress and module in ('mechanistic','heads','source_spans','continuation'):
+                        total=len(config.get('patch_layers') or runtime.model.model.layers)
+                        completed_layers=[0]
+                        layer_progress(module,0,total,None)
+                        def finished(layer):
+                            completed_layers[0]+=1
+                            layer_progress(module,completed_layers[0],total,layer)
+                        layer_options={'on_layer':finished}
                     if module=='sufficiency':
                         same=[r for r in record['rows'] if r['model']==row['model'] and r['decision'] and r['decision_history']!=history and abs(r['decision']['margin']-row['decision']['margin'])<=config.get('stance_match_tolerance',0.1)]
                         if not same:
@@ -37,13 +52,17 @@ def run(path, config, texts, runtimes, progress):
                     elif module in ('heads','source_spans'):
                         from .interventions import head_sweep,source_span_sweep
                         function=head_sweep if module=='heads' else source_span_sweep
-                        results.append(dict(task=source.stem,agent=row['agent'],round=row['round'],model=row['model'],effects=function(runtime,before,history,scenario,texts,config.get('patch_layers'))))
+                        results.append(dict(task=source.stem,agent=row['agent'],round=row['round'],model=row['model'],effects=function(runtime,before,history,scenario,texts,config.get('patch_layers'),**layer_options)))
                     elif module=='continuation':
                         from .continuation import evaluate
-                        results.append(evaluate(record,row,before,scenario,texts,runtimes,source.stem,config.get('continuation_layer',-1)))
+                        layers=(config.get('patch_layers') or range(len(runtime.model.model.layers))) if config.get('continuation_all_layers') else [config.get('continuation_layer',-1)]
+                        for layer in layers:
+                            progress(f'continuation layer {layer}',row['model'],scenario['id'])
+                            results.append(evaluate(record,row,before,scenario,texts,runtimes,source.stem,layer))
+                            if layer_progress:finished(layer)
                     elif module=='mechanistic':
                         from .interventions import sweep
-                        effects=sweep(runtime,before,history,scenario,texts,config.get('patch_layers'))
+                        effects=sweep(runtime,before,history,scenario,texts,config.get('patch_layers'),**layer_options)
                         results.append(dict(task=source.stem,agent=row['agent'],round=row['round'],model=row['model'],effects=effects,
                             scope='Exploratory final-prompt-position residual/attention/MLP substitution; no downstream continuation'))
                     else:
@@ -59,6 +78,7 @@ def run(path, config, texts, runtimes, progress):
         for model in list(runtimes):
             runtime=runtimes[model]
             for scenario in config['scenarios']:
+                texts=for_condition(base_texts, config, scenario)
                 history=initial(scenario,texts,config['presentation_order'],config['agents'])
                 if module=='validation':
                     from .validation import evaluate

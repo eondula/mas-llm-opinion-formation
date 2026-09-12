@@ -19,8 +19,13 @@ class PreviewStartTests(unittest.TestCase):
             rows=conversation(c,c['scenarios'][0],templates(),{m:FakeRuntime() for m in models})
             self.assertEqual(len(rows),6)
             self.assertEqual([r['model'] for r in rows[:3]],models*3 if len(models)==1 else models)
+        for models in (['x','y','z','x'],['x','x','x','x']):
+            c=resolve(dict(agents=4,models=models,agent_configuration='heterogeneous',rounds=1))
+            rows=conversation(c,c['scenarios'][0],templates(),{m:FakeRuntime() for m in models})
+            self.assertEqual(len(rows),8)
+            self.assertEqual([r['model'] for r in rows[:4]],models)
         with self.assertRaises(ValueError):
-            resolve(dict(agents=3,models=['x','x','y'],agent_configuration='heterogeneous'))
+            resolve(dict(agents=4,models=['x','y','z'],agent_configuration='heterogeneous'))
         with self.assertRaises(ValueError):
             resolve(dict(grid={'schedule':['synchronous']}))
 

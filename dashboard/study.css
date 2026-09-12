@@ -50,3 +50,15 @@ main{padding:30px 36px}.context{padding:5px 0 22px}.context h2{font-size:32px;fo
 .run-progress #timing{margin:0;font-size:12px;white-space:nowrap}
 #experiment .context{padding-top:0}
 @media(max-width:850px){.run-progress{grid-template-columns:auto minmax(0,1fr);gap:10px 16px}.run-progress #timing{grid-column:1/-1;white-space:normal}}
+/* Message bubbles share the checkpoint fill used by their agent's face. */
+#arena .agent{--bubble-ink:#fff}
+[data-theme=dark] #arena .agent{--bubble-ink:#171b23}
+#arena .agent .bubble,
+#arena .agent .bubble::after{background:var(--agent-color);border-color:var(--agent-color)!important;color:var(--bubble-ink)}
+#arena .agent .bubble .speaker,
+#arena .agent .bubble .message{color:var(--bubble-ink)!important}
+#arena .agent .bubble .message::selection{background:var(--bubble-ink);color:var(--agent-color)}
+#scenario-dialog{width:min(850px,94vw);max-height:90vh;overflow:auto;padding:28px;border:1px solid var(--edge);border-radius:16px;background:var(--surface);color:var(--ink)}#scenario-dialog::backdrop{background:#090c15b8}#scenario-dialog p{font-size:13px;color:var(--muted)}.scenario-fields{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:20px 0}.scenario-fields label{display:block;text-transform:none;letter-spacing:0;font-size:13px;margin:12px 0}.scenario-fields input,.scenario-fields textarea{display:block;width:100%;padding:10px;margin-top:6px;background:var(--paper);color:var(--ink);border:1px solid var(--edge);border-radius:6px}.scenario-fields textarea{min-height:90px;resize:vertical}.scenario-fields fieldset{min-width:0;border:1px solid var(--edge);border-radius:8px;padding:14px}#scenario-error{color:#e6608c!important}@media(max-width:650px){.scenario-fields{grid-template-columns:1fr}}
+/* Plot series are independent of blue/magenta strategy colors. */
+:root{--plot-1:#c65b00;--plot-2:#16803c;--plot-3:#925000;--plot-4:#46750c}
+:root[data-theme=dark]{--plot-1:#ff9a32;--plot-2:#39ff88;--plot-3:#ffd166;--plot-4:#bbff45}

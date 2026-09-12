@@ -12,6 +12,8 @@ def export(path):
     records=[(p.stem,json.loads(p.read_text())) for p in sorted((path/'conversations').glob('*.json'))]
     produced=[]
     def save(fig,name,section):
+        from .plot_data import export as export_plot_data
+        if not name.endswith('_public_states'):export_plot_data(fig,folder/section/(name+'.csv'))
         for ext in ('pdf','png'):fig.savefig(folder/section/(name+'.'+ext),dpi=180,bbox_inches='tight')
         plt.close(fig);produced.append(dict(name=name,section=section))
     for page in range(0,len(records),6):
@@ -40,6 +42,8 @@ def export(path):
         fig,ax=plt.subplots(figsize=(6,5));positions=nx.circular_layout(graph)
         nx.draw_networkx(graph,pos=positions,ax=ax,node_color='#dbe8f5',node_size=1300,arrows=True,connectionstyle='arc3,rad=0.15')
         nx.draw_networkx_edge_labels(graph,pos=positions,edge_labels=nx.get_edge_attributes(graph,'weight'),ax=ax)
+        from .tables import table
+        table(folder/'appendix'/(task+'_public_states'),[dict(source=a,target=b,transitions=d['weight']) for a,b,d in graph.edges(data=True)])
         ax.set_title(task+' public states (edge labels = transition counts)');ax.axis('off');save(fig,task+'_public_states','appendix')
         row=next((r for r in record['rows'] if r['round']>0 and r['decision']),None)
         if row and row['decision'].get('token_log_probs'):
@@ -55,7 +59,10 @@ def export(path):
             ax.set(xlabel='Observed decision margin',ylabel='Predicted decision margin');ax.legend();save(fig,'prediction','main')
     for source in sorted(folder.glob('*')):
         if not source.is_file():continue
-        if source.suffix in ('.csv','.json'):shutil.copy2(source,folder/'data'/source.name)
+        if source.suffix in ('.csv','.json'):
+            shutil.copy2(source,folder/'data'/source.name)
+            if source.suffix=='.csv' and source.with_suffix('.png').exists():
+                shutil.copy2(source,folder/'appendix'/source.name)
         elif source.suffix in ('.pdf','.png','.txt'):shutil.copy2(source,folder/'appendix'/source.name)
     for filename in ('replay','mechanistic'):
         source=path/'measurements'/f'{filename}.json'
@@ -99,7 +106,7 @@ def export(path):
                     ax.plot([r['round'] for r in rs],[r['post']['margin'] for r in rs],label=name+' patched')
                     ax.plot([r['round'] for r in bs],[r['margin'] for r in bs],linestyle='--',label=name+' baseline')
                 ax.axvline(row['round'],color='gray');ax.set(xlabel='Round',ylabel='Post-response raw margin');ax.legend()
-            ax.set_title(f"{filename}: {row['task']} / {row['agent']} / round {row['round']}")
+            ax.set_title(f"{filename}: {row['task']} / {row['agent']} / round {row['round']}" + (f" / layer {row['layer']}" if filename=='continuation' else ''))
             save(fig,f'{filename}_{i:03d}','appendix')
     fig,ax=plt.subplots(figsize=(11,2));ax.axis('off')
     steps=['History','Candidate scores','Strategy','Public message','Peer delivery']

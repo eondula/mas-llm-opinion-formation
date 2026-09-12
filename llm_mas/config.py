@@ -12,17 +12,21 @@ def digest(value):
 def scenario(value):
     path = Path(value)
     if not path.is_file():
-        path = ROOT / 'scenarios' / 'controlled' / f'{value}.json'
+        candidates=[ROOT/path,ROOT/'scenarios/controlled'/f'{value}.json',ROOT/'scenarios/custom'/f'{value}.json']
+        path=next((p for p in candidates if p.is_file()),candidates[1])
     data = json.loads(path.read_text())
     validate_scenario(data)
     return data
 
 def validate_scenario(data):
+    if not isinstance(data,dict):raise ValueError('Scenario must be a JSON object')
     for field in ('id', 'title'):
         if not isinstance(data.get(field), str) or not data[field].strip():
             raise ValueError(f'Missing scenario {field}')
+    if not re.fullmatch(r'[A-Za-z0-9_-]+',data['id']):raise ValueError('Scenario ID may contain only letters, numbers, underscores and hyphens')
     for key in ('strategy_1', 'strategy_2'):
         s = data.get(key, {})
+        if not isinstance(s,dict):raise ValueError(f'{key} must be an object')
         for field in ('name', 'property_1', 'property_2', 'candidate'):
             if not isinstance(s.get(field), str) or not s[field].strip():
                 raise ValueError(f'Missing {key}.{field}')
@@ -34,6 +38,13 @@ def validate_scenario(data):
         raise ValueError('Candidate statements must differ')
 
 def resolve(raw):
+    if raw.get('mode') == 'experiment_c':
+        import json
+        preset = json.loads((ROOT/'studies/experiment_C.json').read_text())
+        # Dashboard controls that remain meaningful for this fixed comparison.
+        preset.update({k:raw[k] for k in ('scenarios','rounds','max_argument_tokens','device','run_id') if k in raw})
+        raw = preset
+
     c = dict(mode='preview', models=[DEFAULT_MODEL], agents=2, scenarios=['storage'], rounds=20,
              initialization='natural', schedule='synchronous', argument_mode='predefined',
              max_argument_tokens=128, sentiment=True, device='auto', presentation_order='strategy_1_first')
@@ -61,12 +72,12 @@ def resolve(raw):
         raise ValueError('Supply one model or one checkpoint per agent')
     if c.get('agent_configuration') == 'homogeneous' and len(set(c['models'])) != 1:
         raise ValueError('Homogeneous mode requires a shared checkpoint')
-    if c.get('agent_configuration') == 'heterogeneous' and (len(c['models']) != c['agents'] or len(set(c['models'])) != c['agents']):
-        raise ValueError('Heterogeneous mode requires a different checkpoint for each agent')
+    if c.get('agent_configuration') == 'heterogeneous' and len(c['models']) != c['agents']:
+        raise ValueError('Per-agent mode requires one checkpoint selection per agent; repeated checkpoints are allowed')
     if c['mode']=='preview' and any(c.get(k) for k in ('grid','agent_counts','model_configurations')):
         raise ValueError('Preview runs one conversation; sweeps require study mode')
     if c['schedule'] not in ('synchronous', 'sequential', 'reverse_sequential', 'no_peer'): raise ValueError('Invalid schedule')
-    if c['argument_mode'] not in ('predefined', 'generated'): raise ValueError('Invalid argument mode')
+    if c['argument_mode'] not in ('predefined', 'agent_selected', 'generated', 'conversational', 'combined_fixed', 'combined_reasoning'): raise ValueError('Invalid argument mode')
     if c['presentation_order'] not in ('strategy_1_first', 'strategy_2_first'): raise ValueError('Invalid presentation order')
     if c['device'] not in ('auto', 'cpu', 'cuda', 'mps'): raise ValueError('Invalid device')
     if not isinstance(c['max_argument_tokens'], int) or not 1 <= c['max_argument_tokens'] <= 2048: raise ValueError('Invalid token limit')
