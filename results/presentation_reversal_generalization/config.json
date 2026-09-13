@@ -1,0 +1,77 @@
+{
+  "blocks": [
+    12,
+    13,
+    14,
+    15
+  ],
+  "cases": [
+    {
+      "name": "sensor_none",
+      "agent": "Agent A",
+      "forward": "results/studies/full_behavioral_v2/conversations/000_000.json",
+      "reversed": "results/studies/full_reversed_v3/conversations/000_000.json",
+      "group": "discovery",
+      "saved_class": "changed",
+      "forward_strategy": 2,
+      "reversed_strategy": 1,
+      "prompt_pair_sha256": "01684d4ba9812a1a5d7844c52fc8b057e6ac56ce0b2c924e0355de63c1ba0e8d"
+    },
+    {
+      "name": "storage_none",
+      "agent": "Agent A",
+      "forward": "results/studies/full_behavioral_v2/conversations/000_001.json",
+      "reversed": "results/studies/full_reversed_v3/conversations/000_001.json",
+      "group": "additional",
+      "saved_class": "unchanged",
+      "forward_strategy": 1,
+      "reversed_strategy": 1,
+      "prompt_pair_sha256": "6debb2a2c0f8eaed66e93a0b55e36396237d5b591297e70f2355da0c27d1e04f"
+    },
+    {
+      "name": "sensor_priority_1",
+      "agent": "Agent A",
+      "forward": "results/studies/full_behavioral_v2/conversations/024_000.json",
+      "reversed": "results/studies/full_reversed_v3/conversations/006_000.json",
+      "group": "additional",
+      "saved_class": "unchanged",
+      "forward_strategy": 1,
+      "reversed_strategy": 1,
+      "prompt_pair_sha256": "2f13f722f6e04e9b3db3d019dd46c8d1a5f6227ba9534e87b98cc35e00b78768"
+    },
+    {
+      "name": "sensor_priority_2",
+      "agent": "Agent B",
+      "forward": "results/studies/full_behavioral_v2/conversations/024_000.json",
+      "reversed": "results/studies/full_reversed_v3/conversations/006_000.json",
+      "group": "additional",
+      "saved_class": "unchanged",
+      "forward_strategy": 2,
+      "reversed_strategy": 2,
+      "prompt_pair_sha256": "6e96c4c1e0d5a1a11bfdd9fa0e56d9a6c1254d0fb0250b2207ae9599d51b2211"
+    },
+    {
+      "name": "storage_priority_1",
+      "agent": "Agent A",
+      "forward": "results/studies/full_behavioral_v2/conversations/024_001.json",
+      "reversed": "results/studies/full_reversed_v3/conversations/006_001.json",
+      "group": "additional",
+      "saved_class": "changed",
+      "forward_strategy": 2,
+      "reversed_strategy": 1,
+      "prompt_pair_sha256": "af15850a3925bce659479f04948800d6504f895a5737b4c28bb86692d89df10c"
+    },
+    {
+      "name": "storage_priority_2",
+      "agent": "Agent B",
+      "forward": "results/studies/full_behavioral_v2/conversations/024_001.json",
+      "reversed": "results/studies/full_reversed_v3/conversations/006_001.json",
+      "group": "additional",
+      "saved_class": "changed",
+      "forward_strategy": 2,
+      "reversed_strategy": 1,
+      "prompt_pair_sha256": "5bac5580cde8dad753d24f0807e889249c8afc3caabbcc8e3096f4a5fb8ddf47"
+    }
+  ],
+  "duplicate_pairs_excluded": 42
+}
