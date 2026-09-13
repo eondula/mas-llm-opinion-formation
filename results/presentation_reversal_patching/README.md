@@ -78,7 +78,7 @@ and validity outcomes; it cannot be inferred from these margin interventions.
 - `observation_controls.csv`, `activations_*.pt`: capture controls and block states.
 - `patches.csv`: both scores, margin, margin change, selected strategy, donor match,
   actual choice change, and self replacement errors by layer and direction.
-- `layer_transfer.png` and `.pdf`: resulting strategies and margin changes.
+- `layer_transfer.png`: resulting strategies and margin changes.
 - `interpretation.md`: brief finding and follow-up scope.
 
 Artifacts after the replay gate are only produced if replay succeeds. The

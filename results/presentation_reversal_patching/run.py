@@ -60,7 +60,7 @@ def plot_results(cfg, results):
         axes[i,0].set(title=case['name']+' — patched strategy',yticks=[1,2],ylabel='Semantic strategy')
         axes[i,1].set(title=case['name']+' — margin change',ylabel='Patched − recipient margin');axes[i,1].axhline(0,color='gray',lw=.6)
         for ax in axes[i]:ax.set_xlabel('Transformer block (zero indexed)');ax.legend(fontsize=8)
-    fig.tight_layout();fig.savefig(OUT/'layer_transfer.png',dpi=180);fig.savefig(OUT/'layer_transfer.pdf');plt.close(fig)
+    fig.tight_layout();fig.savefig(OUT/'layer_transfer.png',dpi=180);plt.close(fig)
 
 def pilot_device(torch, requested):
     """Prefer CUDA, then MPS; never silently select CPU."""

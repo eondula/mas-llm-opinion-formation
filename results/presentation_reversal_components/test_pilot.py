@@ -48,6 +48,31 @@ class ComponentTests(unittest.TestCase):
             with pilot.patch(module,2,torch.zeros(2)):raise RuntimeError('abort')
         self.assertFalse(module._forward_hooks)
 
+    def test_csv_plot_reproduction(self):
+        import csv
+        original=pilot.OUT
+        with tempfile.TemporaryDirectory() as directory:
+            pilot.OUT=Path(directory)
+            try:
+                cfg=dict(cases=[dict(name='changed'),dict(name='unchanged')],layers=[12,13,14,15])
+                rows=[]
+                for case in ('changed','unchanged'):
+                    for direction in ('forward_to_reversed','reversed_to_forward'):
+                        for component in ('attention','mlp','residual'):
+                            for layer in cfg['layers']:
+                                rows.append(dict(case=case,direction=direction,component=component,layer=layer,control='donor',likelihood_1=-1.,likelihood_2=-1.2,margin=.2,recipient_margin=.1,donor_margin=.3,margin_delta=.1,strategy=1,recipient_strategy=1,donor_strategy=1,transfer=0))
+                pilot.export_figure_data(rows)
+                with (pilot.OUT/'component_effects_data.csv').open() as f:
+                    saved=list(csv.DictReader(f))
+                self.assertEqual(len(saved),48)
+                self.assertEqual(float(saved[0]['choice_boundary_delta']),-.1)
+                pilot.plot_results(cfg)
+                first=(pilot.OUT/'component_effects.png').read_bytes()
+                pilot.plot_results(cfg)
+                self.assertEqual(first,(pilot.OUT/'component_effects.png').read_bytes())
+                self.assertFalse((pilot.OUT/'component_effects.pdf').exists())
+            finally:pilot.OUT=original
+
     def test_gpu_selection(self):
         fake=SimpleNamespace(cuda=SimpleNamespace(is_available=lambda:False),backends=SimpleNamespace(mps=SimpleNamespace(is_available=lambda:True)))
         self.assertEqual(pilot.pilot_device(fake,'auto'),'mps')

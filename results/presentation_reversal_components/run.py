@@ -38,7 +38,23 @@ def component_modules(runtime, layers):
     return modules
 
 
-def plot_results(cfg, results):
+def export_figure_data(results):
+    fields=('case','direction','layer','component','control','likelihood_1','likelihood_2',
+            'margin','recipient_margin','donor_margin','margin_delta','strategy',
+            'recipient_strategy','donor_strategy','transfer')
+    rows=[]
+    for result in results:
+        if result['control']!='donor':continue
+        row={key:result[key] for key in fields}
+        row['choice_boundary_delta']=-float(result['recipient_margin'])
+        rows.append(row)
+    table('component_effects_data.csv',rows)
+
+
+def plot_results(cfg):
+    # Both initial plots and regeneration use the exact same saved CSV.
+    with (OUT/'component_effects_data.csv').open() as source:
+        results=list(csv.DictReader(source))
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -52,11 +68,11 @@ def plot_results(cfg, results):
                 b.plot([int(r['layer']) for r in rows],[int(r['strategy']) for r in rows],'.-',label=component)
             a.axhline(0,color='gray',lw=.7)
             reference=rows[0]
-            a.axhline(-float(reference['recipient_margin']),color='black',ls=':',lw=1,label='choice boundary')
+            a.axhline(float(reference['choice_boundary_delta']),color='black',ls=':',lw=1,label='choice boundary')
             a.set(title=case['name']+' / '+direction,ylabel='Patched minus recipient margin')
             b.set(title='Selected strategy',ylabel='Semantic strategy',yticks=[1,2],ylim=(.8,2.2))
             for ax in (a,b):ax.set_xlabel('Block (zero indexed)');ax.set_xticks(cfg['layers']);ax.legend(fontsize=8)
-    fig.tight_layout();fig.savefig(OUT/'component_effects.png',dpi=180);fig.savefig(OUT/'component_effects.pdf');plt.close(fig)
+    fig.tight_layout();fig.savefig(OUT/'component_effects.png',dpi=180);plt.close(fig)
 
 
 def main():
@@ -73,7 +89,8 @@ def main():
         for row in rows:
             for key in ('layer','strategy'):row[key]=int(row[key])
             row['margin_delta']=float(row['margin_delta'])
-        plot_results(cfg,rows)
+        export_figure_data(rows)
+        plot_results(cfg)
         return
     inputs=[];baseline=[]
     for case in cfg['cases']:
@@ -172,7 +189,8 @@ def main():
                 peak=max(selected,key=lambda r:abs(r['margin_delta']))
                 summaries.append(dict(case=case['name'],direction=direction,component=component,peak_layer=peak['layer'],peak_delta=peak['margin_delta'],peak_margin=peak['margin'],transfer_layers=','.join(str(r['layer']) for r in selected if r['transfer']),choice_change_layers=','.join(str(r['layer']) for r in selected if r['changed_strategy'])))
     table('component_summary.csv',summaries)
-    plot_results(cfg,results)
+    export_figure_data(results)
+    plot_results(cfg)
     lines=['# Component pilot summary','',
            'All replay, observation and self controls passed. Layers are zero indexed.',
            'Each replacement is separate; attention and MLP effects are not additive.',

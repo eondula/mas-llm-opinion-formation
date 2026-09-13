@@ -412,3 +412,8 @@ This applies consistently to generation and all candidate measurements.
 Original histories are preserved; saved rendered prompts include the directive.
 Existing study presets are unchanged. Run a short scored and generated preview
 on your server before launching a complete study.
+
+### Figure export format
+
+Save research figures as PNG only, with CSV measurements sufficient to reproduce
+them. Do not create PDF copies of figures for new analyses or future exports.

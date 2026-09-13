@@ -82,7 +82,10 @@ Outputs:
   differences, baseline margins and strategies, choice changes, donor match,
   transfer indicators and self errors.
 - `component_summary.csv`: effects separated by case, direction and component.
-- `component_effects.png` and `.pdf`: margin changes and resulting strategies;
+- `component_effects_data.csv`: one row per plotted donor replacement, including
+  layer, component, case, direction, both scores, margins, strategy, transfer and
+  the choice-boundary value. Both initial plotting and regeneration read this CSV.
+- `component_effects.png`: margin changes and resulting strategies;
   the dotted margin line marks the change needed to reach the choice boundary.
 - `interpretation.md`: descriptive summary and limits, written only after success.
 
