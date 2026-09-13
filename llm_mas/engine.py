@@ -49,11 +49,12 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
             argument_index = None
             autonomous = config.get('decision_mode') == 'generated' and not forced
             if autonomous:
-                from .choice_output import parse, instruction
+                from .choice_output import parse, instruction, recovery, PARSER_VERSION
                 prompt = instruction(texts, scenario)
                 generation = runtime.generate(histories[i]+[{'role':'user','content':prompt}], config['max_argument_tokens'], **generation_options)
                 generation = dict(generation, instruction=prompt)
                 strategy, argument, choice_status = parse(generation['output'])
+                generation.update(choice_parser_version=PARSER_VERSION, choice_recovery=recovery(generation['output']))
             elif config['argument_mode'] in ('generated', 'conversational'):
                 prompt = texts['generate_argument'].format(candidate=selected['candidate'])
                 if config['argument_mode'] == 'conversational':

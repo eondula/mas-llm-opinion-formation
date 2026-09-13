@@ -71,3 +71,27 @@ class FullStudyTests(unittest.TestCase):
             self.assertEqual(row['choice_status'], 'valid')
             self.assertEqual(display_event(dict(task='reversed', row=row))['row']['display_message'], 'Strategy 2\nReason.')
             self.assertEqual(row['message'], row['generation']['output'])
+
+    def test_missing_final_brace_recovery_is_narrow_and_audited(self):
+        from llm_mas.choice_output import recovery
+        raw = '{"strategy":2,"explanation":"Reason."'
+        self.assertEqual(parse(raw), (2, 'Reason.', 'valid'))
+        self.assertEqual(recovery(raw), 'missing_final_object_brace')
+        self.assertIsNone(recovery(raw + '}'))
+        for invalid in ['{"strategy":2,"explanation":"unfinished',
+                        '{"strategy":3,"explanation":"Reason."',
+                        '{"strategy":true,"explanation":"Reason."',
+                        '{"strategy":2,"explanation":"Reason.","extra":"x"',
+                        'prose ' + raw]:
+            self.assertIsNone(parse(invalid)[0])
+
+    def test_recovered_generated_choice_preserves_raw_history(self):
+        class MissingBraceRuntime(Runtime):
+            def generate(self, *args, **kwargs):
+                return dict(output='{"strategy":2,"explanation":"Reason."')
+        c=resolve(dict(rounds=1,argument_mode='combined_reasoning',decision_mode='generated',reverse_candidate_blocks=True,presentation_order='strategy_2_first'))
+        rows=conversation(c,c['scenarios'][0],templates(),{c['models'][0]:MissingBraceRuntime()})
+        for row in rows:
+            self.assertEqual(row['strategy'],2)
+            self.assertEqual(row['generation']['choice_recovery'],'missing_final_object_brace')
+            self.assertEqual(row['history'][-1]['content'],row['generation']['output'])
