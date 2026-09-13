@@ -95,3 +95,30 @@ class FullStudyTests(unittest.TestCase):
             self.assertEqual(row['strategy'],2)
             self.assertEqual(row['generation']['choice_recovery'],'missing_final_object_brace')
             self.assertEqual(row['history'][-1]['content'],row['generation']['output'])
+
+    def test_dashboard_modes_recover_unclosed_fenced_choices(self):
+        from llm_mas.choice_output import recovery, PARSER_VERSION
+        from llm_mas.web import display_event
+        raw = '```json\n{"strategy":2,"explanation":"Coverage matters."'
+        class DashboardRuntime(Runtime):
+            def generate(self, *args, **kwargs):
+                return dict(output=raw)
+        for mode in ('preview', 'no_fixed_rounds', 'experiment_c', 'study'):
+            with self.subTest(mode=mode):
+                c=resolve(dict(mode=mode,rounds=1,agents=3,argument_mode='combined_reasoning',decision_mode='generated',initialization='natural',stopping='fixed'))
+                with patch('llm_mas.message_similarity.MessageSimilarity') as cls:
+                    cls.return_value.compare.return_value=[1.]*3
+                    cls.return_value.encoder='test';cls.return_value.revision='test'
+                    rows=conversation(c,c['scenarios'][0],templates(),{c['models'][0]:DashboardRuntime()})
+                for row in rows:
+                    self.assertEqual(row['strategy'],2)
+                    self.assertEqual(row['choice_status'],'valid')
+                    self.assertEqual(row['generation']['choice_parser_version'],PARSER_VERSION)
+                    self.assertEqual(row['generation']['choice_recovery'],'missing_final_object_brace_and_markdown_fence')
+                    self.assertEqual(row['post']['stance'],-.46)
+                    self.assertEqual(row['history'][-1]['content'],raw)
+                    shown=display_event(dict(task='dashboard',row=row))['row']
+                    self.assertEqual(shown['display_message'],'Strategy 2\nCoverage matters.')
+        self.assertEqual(recovery(raw+'}'),'missing_closing_markdown_fence')
+        for invalid in [raw[:-1],raw+' extra',raw+'\n```\nextra']:
+            self.assertNotEqual(parse(invalid)[2],'valid')

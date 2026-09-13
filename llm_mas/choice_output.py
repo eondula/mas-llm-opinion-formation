@@ -1,15 +1,22 @@
 """Explicit schema for autonomous public choices; no wording heuristics."""
 import json
 
-PARSER_VERSION = "3-missing-final-object-brace"
+PARSER_VERSION = "4-unclosed-json-fence"
+
+def _candidate(text):
+    candidate = text.strip() if isinstance(text, str) else text
+    open_fence = False
+    if isinstance(candidate, str):
+        lines = candidate.splitlines()
+        if lines and lines[0].strip().lower() in ('```json', '```'):
+            closed = len(lines) > 1 and lines[-1].strip() == '```'
+            candidate = '\n'.join(lines[1:-1] if closed else lines[1:]).strip()
+            open_fence = not closed
+    return candidate, open_fence
+
 
 def parse(text):
-    candidate = text.strip() if isinstance(text,str) else text
-    # Accept a single enclosing Markdown fence, not arbitrary prose or JSON repair.
-    if isinstance(candidate,str):
-        lines=candidate.splitlines()
-        if len(lines)>=3 and lines[0].strip().lower() in ('```json','```') and lines[-1].strip()=='```':
-            candidate='\n'.join(lines[1:-1])
+    candidate, _ = _candidate(text)
     try:
         value=json.loads(candidate)
     except (ValueError,TypeError):
@@ -51,12 +58,14 @@ def recovery(text):
     """Audit whether a valid choice needed the single-brace recovery."""
     if parse(text)[2] != 'valid':
         return None
-    candidate = text.strip()
-    lines = candidate.splitlines()
-    if len(lines) >= 3 and lines[0].strip().lower() in ('```json', '```') and lines[-1].strip() == '```':
-        candidate = '\n'.join(lines[1:-1])
+    candidate, open_fence = _candidate(text)
+    missing_brace = False
     try:
         json.loads(candidate)
     except ValueError:
-        return 'missing_final_object_brace'
-    return None
+        missing_brace = True
+    if open_fence and missing_brace:
+        return 'missing_final_object_brace_and_markdown_fence'
+    if open_fence:
+        return 'missing_closing_markdown_fence'
+    return 'missing_final_object_brace' if missing_brace else None
