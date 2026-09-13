@@ -50,7 +50,7 @@ main{padding:30px 36px}.context{padding:5px 0 22px}.context h2{font-size:32px;fo
 .run-progress #timing{margin:0;font-size:12px;white-space:nowrap}
 #experiment .context{padding-top:0}
 @media(max-width:850px){.run-progress{grid-template-columns:auto minmax(0,1fr);gap:10px 16px}.run-progress #timing{grid-column:1/-1;white-space:normal}}
-/* Message bubbles share the checkpoint fill used by their agent's face. */
+/* Message bubbles and faces share their agent's plot color. */
 #arena .agent{--bubble-ink:#fff}
 [data-theme=dark] #arena .agent{--bubble-ink:#171b23}
 #arena .agent .bubble,
@@ -68,7 +68,7 @@ main{padding:30px 36px}.context{padding:5px 0 22px}.context h2{font-size:32px;fo
 .bubble.response-pop { animation:response-pop 220ms ease-out; }
 @media (prefers-reduced-motion:reduce) { .bubble.response-pop { animation:none; } }
 
-/* Illustrated agents: identity remains checkpoint-colored; choice is labeled below. */
+/* Illustrated agents: identity uses the plot color; choice is labeled below. */
 #arena .agent .circle,
 #arena .agent .circle.s1,
 #arena .agent .circle.s2,

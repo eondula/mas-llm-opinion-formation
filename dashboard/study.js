@@ -57,6 +57,8 @@ function updateHeading(){
  $('title').textContent=scenario?.title||'Conversation in progress';
  $('description').textContent=[settings.decision_mode==='generated'?'Generated choice':'Scored choice',settings.schedule?.replaceAll('_',' '),settings.initialization==='natural'?'Natural start':settings.initialization?'Forced start':null,settings.argument_mode?({predefined:'Predefined (cyclic)',agent_selected:'Conversational (fixed list)',combined_reasoning:'Combined prompt (flexible reasoning)',combined_fixed:'Combined prompt (fixed list)',generated:'Generated',conversational:'Conversational (generated)'}[settings.argument_mode]||settings.argument_mode)+' arguments':null].filter(Boolean).join(' · ');
 }
+// Shared identity colors for faces, messages, plot traces, and legends.
+function agentColor(index){return `var(--plot-${index%4+1})`;}
 const bubbleFrames=new Map();
 function draw(index){
  updateHeading();
@@ -68,10 +70,9 @@ function draw(index){
  const n=settings?.agents||Number($('agents').value);
  names.splice(0,names.length,...Array.from({length:n},(_,i)=>i<26?`Agent ${String.fromCharCode(65+i)}`:`Agent ${i+1}`));
  const visible=responseFrame(events,index,current,settings||{agents:n,schedule:$('schedule').value});
- const checkpoints=[...new Set(settings?.models||$('models').value.split('\n').filter(Boolean))];
  const arena=$('arena');arena.querySelectorAll('.agent').forEach(e=>e.remove());arena.classList.toggle('many-agents',n>2);arena.style.setProperty('--agent-scale',Number($('size').value)/100);
  if(n>2)arena.style.minHeight=Math.max(850,n*110)+'px';else arena.style.minHeight='';
- names.forEach((name,i)=>{const row=seen[name],node=agentTemplate.cloneNode(true);node.id='study-agent-'+i;const checkpoint=row?.model||settings?.models?.[settings.models.length===1?0:i]||checkpoints[0];node.style.setProperty('--agent-color',['var(--checkpoint-1)','var(--checkpoint-2)','var(--checkpoint-3)'][Math.max(0,checkpoints.indexOf(checkpoint))%3]);node.className='agent '+(i%2?'right':'left');
+ names.forEach((name,i)=>{const row=seen[name],node=agentTemplate.cloneNode(true);node.id='study-agent-'+i;node.style.setProperty('--agent-color',agentColor(i));node.className='agent '+(i%2?'right':'left');
  if(n>2){const angle=2*Math.PI*i/n-Math.PI/2;node.style.left=(50+33*Math.cos(angle))+'%';node.style.top=(50+34*Math.sin(angle))+'%';}
  node.querySelector('.speaker').textContent=name;node.querySelector('.name').textContent=name;node.querySelector('.message').textContent=row?.message||'';
  const active=visible.find(r=>r.agent===name);
@@ -91,11 +92,11 @@ function draw(index){
  $('delivery').textContent='';$('delivery').hidden=true;
  chart('stance-chart',all.length?Object.fromEntries(names.map(name=>[name,all.filter(e=>e.row.agent===name).map(e=>e.row.post.stance)])):null,'Post-response stance');
  const sent=all.some(e=>typeof e.row.sentiment==='number');chart('sentiment-chart',sent?Object.fromEntries(names.map(name=>[name,all.filter(e=>e.row.agent===name).map(e=>e.row.sentiment)])):null,'Sentiment available after scoring');
- const legend=document.querySelector('.legend');legend.replaceChildren();names.forEach((name,i)=>{const span=document.createElement('span');span.textContent=name;span.style.color=['var(--plot-1)','var(--plot-2)','var(--plot-3)','var(--plot-4)'][i%4];legend.append(span);});
+ const legend=document.querySelector('.legend');legend.replaceChildren();names.forEach((name,i)=>{const span=document.createElement('span');span.textContent=name;span.style.color=agentColor(i);legend.append(span);});
  requestAnimationFrame(drawLinks);
 }
 let arrowFrame=null,lastAnimatedDelivery=null;
-// Canvas robot: transparent surroundings, checkpoint-filled rectangular head.
+// Canvas robot: transparent surroundings, agent-colored rectangular head.
 function drawRobots(){
  document.querySelectorAll('#arena .agent').forEach(agent=>{
   const canvas=agent.querySelector('.agent-robot');if(!canvas)return;
@@ -178,7 +179,7 @@ function chart(container, trajectories, caption) {
   const n=Math.max(...names.map(k=>trajectories[k]?.length||0));const x=i=>l+i/Math.max(n-1,1)*(W-l-r),y=v=>t+(1-v)/2*(H-t-b);
   for(const v of [-1,0,1]){make('line',{x1:l,y1:y(v),x2:W-r,y2:y(v),stroke:'var(--edge)'});make('text',{x:l-9,y:y(v)+4,'text-anchor':'end','font-size':11,fill:'var(--muted)'},v);}
   const step=Math.max(1,Math.ceil((n-1)/8));for(let i=0;i<n;i++)if(i%step===0||i===n-1)make('text',{x:x(i),y:H-12,'text-anchor':'middle','font-size':11,fill:'var(--muted)'},i);
-  names.forEach((name,j)=>{const values=trajectories[name]||[],color=['var(--plot-1)','var(--plot-2)','var(--plot-3)','var(--plot-4)'][j%4];const points=values.map((v,i)=>`${x(i)},${y(v)}`).join(' ');make('polyline',{points,fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':['','6 4','2 3','9 3 2 3'][j%4]});values.forEach((v,i)=>{const dot=make('circle',{cx:x(i),cy:y(v),r:3,fill:color});const title=document.createElementNS(ns,'title');title.textContent=`${name} · round ${i}: ${fmt(v)}`;dot.append(title);});});box.append(svg);
+  names.forEach((name,j)=>{const values=trajectories[name]||[],color=agentColor(j);const points=values.map((v,i)=>`${x(i)},${y(v)}`).join(' ');make('polyline',{points,fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':['','6 4','2 3','9 3 2 3'][j%4]});values.forEach((v,i)=>{const dot=make('circle',{cx:x(i),cy:y(v),r:3,fill:color});const title=document.createElementNS(ns,'title');title.textContent=`${name} · round ${i}: ${fmt(v)}`;dot.append(title);});});box.append(svg);
 }
 
 async function refreshRuns(){
