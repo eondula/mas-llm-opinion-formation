@@ -95,7 +95,35 @@ function draw(index){
  requestAnimationFrame(drawLinks);
 }
 let arrowFrame=null,lastAnimatedDelivery=null;
+// Canvas robot: transparent surroundings, checkpoint-filled rectangular head.
+function drawRobots(){
+ document.querySelectorAll('#arena .agent').forEach(agent=>{
+  const canvas=agent.querySelector('.agent-robot');if(!canvas)return;
+  const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height)return;
+  const ratio=window.devicePixelRatio||1;
+  canvas.width=Math.round(rect.width*ratio);canvas.height=Math.round(rect.height*ratio);
+  const ctx=canvas.getContext('2d');ctx.scale(canvas.width/140,canvas.height/140);
+  const style=getComputedStyle(agent),color=style.getPropertyValue('--agent-color').trim()||'#287c9d';
+  const face=style.getPropertyValue('--bubble-ink').trim()||'#fff';
+  const active=agent.classList.contains('is-active');
+  ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=2.5;ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.beginPath();ctx.moveTo(70,37);ctx.lineTo(70,17);
+  ctx.moveTo(30,59);ctx.lineTo(22,59);ctx.lineTo(22,79);ctx.lineTo(30,79);
+  ctx.moveTo(110,59);ctx.lineTo(118,59);ctx.lineTo(118,79);ctx.lineTo(110,79);
+  ctx.moveTo(39,121);ctx.bezierCurveTo(39,91,101,91,101,121);ctx.stroke();
+  ctx.beginPath();ctx.roundRect(32,37,76,54,12);ctx.fill();
+  ctx.fillStyle=face;
+  for(const x of [55,85]){ctx.beginPath();ctx.arc(x,61,5,0,Math.PI*2);ctx.fill();}
+  ctx.strokeStyle=face;ctx.beginPath();ctx.moveTo(60,78);ctx.lineTo(80,78);ctx.stroke();
+  ctx.fillStyle=color;
+  if(active){ctx.shadowColor=color;ctx.shadowBlur=12;}
+  ctx.globalAlpha=active?1:.35;ctx.beginPath();ctx.arc(70,15,5,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;ctx.globalAlpha=1;
+ });
+}
+new MutationObserver(()=>requestAnimationFrame(drawRobots)).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 function drawLinks(){
+ drawRobots();
  if(arrowFrame)cancelAnimationFrame(arrowFrame);
  const canvas=$('exchange-canvas'),rect=$('arena').getBoundingClientRect(),ratio=devicePixelRatio||1;
  canvas.width=rect.width*ratio;canvas.height=rect.height*ratio;
