@@ -110,14 +110,18 @@ function drawRobots(){
   ctx.beginPath();ctx.moveTo(70,37);ctx.lineTo(70,17);
   ctx.moveTo(30,59);ctx.lineTo(22,59);ctx.lineTo(22,79);ctx.lineTo(30,79);
   ctx.moveTo(110,59);ctx.lineTo(118,59);ctx.lineTo(118,79);ctx.lineTo(110,79);
-  ctx.moveTo(39,121);ctx.bezierCurveTo(39,91,101,91,101,121);ctx.stroke();
+  ctx.stroke();
   ctx.beginPath();ctx.roundRect(32,37,76,54,12);ctx.fill();
   ctx.fillStyle=face;
   for(const x of [55,85]){ctx.beginPath();ctx.arc(x,61,5,0,Math.PI*2);ctx.fill();}
   ctx.strokeStyle=face;ctx.beginPath();ctx.moveTo(60,78);ctx.lineTo(80,78);ctx.stroke();
-  ctx.fillStyle=color;
-  if(active){ctx.shadowColor=color;ctx.shadowBlur=12;}
-  ctx.globalAlpha=active?1:.35;ctx.beginPath();ctx.arc(70,15,5,0,Math.PI*2);ctx.fill();
+  const state=agent.querySelector('.circle').classList;
+  const strategy=state.contains('s1')?'--s1':state.contains('s2')?'--s2':null;
+  const light=style.getPropertyValue(strategy||'--muted').trim();
+  const glowing=active&&strategy!==null;
+  ctx.fillStyle=light;
+  if(glowing){ctx.shadowColor=light;ctx.shadowBlur=14;}
+  ctx.globalAlpha=glowing?1:.45;ctx.beginPath();ctx.arc(70,15,7,0,Math.PI*2);ctx.fill();
   ctx.shadowBlur=0;ctx.globalAlpha=1;
  });
 }
