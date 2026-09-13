@@ -54,3 +54,20 @@ class FullStudyTests(unittest.TestCase):
             self.assertTrue((path/'tables/outcomes.csv').exists())
             self.assertTrue((path/'paper_outputs.zip').exists())
             self.assertEqual(json.loads((path/'status.json').read_text())['phase'],'complete')
+
+    def test_reversed_generated_choice_parses_fences_and_preserves_blocks(self):
+        from llm_mas.web import display_event
+        class FencedRuntime(Runtime):
+            def generate(self, *args, **kwargs):
+                return dict(output='```json\n{"strategy":2,"explanation":"Reason."}\n```')
+        raw = json.loads(Path('studies/full_behavioral_reversed.json').read_text())
+        raw.update(rounds=1, decision_mode='generated', stopping='fixed')
+        c = resolve(raw)
+        rows = conversation(c,c['scenarios'][0],templates(),{c['models'][0]:FencedRuntime()})
+        for row in rows:
+            instruction = row['generation']['instruction']
+            self.assertLess(instruction.index('STRATEGY 2'), instruction.index('STRATEGY 1'))
+            self.assertEqual(row['strategy'], 2)
+            self.assertEqual(row['choice_status'], 'valid')
+            self.assertEqual(display_event(dict(task='reversed', row=row))['row']['display_message'], 'Strategy 2\nReason.')
+            self.assertEqual(row['message'], row['generation']['output'])

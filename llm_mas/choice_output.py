@@ -20,3 +20,17 @@ def instruction(texts,scenario):
     q=texts['stance_probe'].format(candidate_1=scenario['strategy_1']['candidate'],candidate_2=scenario['strategy_2']['candidate'])
     q=q[:q.index('Return the exact candidate statement')]
     return q+'Return only a JSON object with "strategy" (integer 1 or 2) and "explanation" (a short paragraph). Do not use markdown fences.'
+
+
+def display_message(row):
+    """Format parseable generated text without changing the recorded decision."""
+    raw = row.get('message', '')
+    strategy, explanation, status = parse(raw)
+    if status == 'valid':
+        text = f'Strategy {strategy}\n{explanation}'
+        if row.get('strategy') != strategy:
+            text += '\n[Display only: saved choice is invalid or differs; record unchanged.]'
+        return text
+    if row.get('choice_status') == 'valid' and row.get('strategy') in (1, 2) and isinstance(row.get('argument'), str):
+        return f"Strategy {row['strategy']}\n{row['argument']}"
+    return raw

@@ -76,7 +76,7 @@ function draw(index){
  node.querySelector('.speaker').textContent=name;node.querySelector('.name').textContent=name;node.querySelector('.message').textContent=row?.message||'';
  const active=visible.find(r=>r.agent===name);
  const shown=active;
- node.classList.toggle('is-active',Boolean(active));node.querySelector('.message').textContent=shown?.choice_status==='valid'?`Strategy ${shown.strategy}\n${shown.argument}`:shown?.message||'';
+ node.classList.toggle('is-active',Boolean(active));node.querySelector('.message').textContent=shown?.display_message ?? (shown?.choice_status==='valid'?`Strategy ${shown.strategy}\n${shown.argument}`:shown?.message||'');
  const bubble=node.querySelector('.bubble');
  const frame=shown?JSON.stringify([currentRun,current,name,shown.round,shown.message]):null;
  bubble.classList.toggle('has-response',Boolean(shown));
