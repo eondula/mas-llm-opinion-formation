@@ -72,7 +72,7 @@ function draw(index){
  const visible=responseFrame(events,index,current,settings||{agents:n,schedule:$('schedule').value});
  const arena=$('arena');arena.querySelectorAll('.agent').forEach(e=>e.remove());arena.classList.toggle('many-agents',n>2);arena.style.setProperty('--agent-scale',Number($('size').value)/100);
  if(n>2)arena.style.minHeight=Math.max(850,n*110)+'px';else arena.style.minHeight='';
- names.forEach((name,i)=>{const row=seen[name],node=agentTemplate.cloneNode(true);node.id='study-agent-'+i;node.style.setProperty('--agent-color',agentColor(i));node.className='agent '+(i%2?'right':'left');
+ names.forEach((name,i)=>{const row=seen[name],node=agentTemplate.cloneNode(true);node.id='study-agent-'+i;node.style.setProperty('--agent-color',agentColor(i));node.style.setProperty('--motion-delay',`${-i*.7}s`);node.className='agent '+(i%2?'right':'left');
  if(n>2){const angle=2*Math.PI*i/n-Math.PI/2;node.style.left=(50+33*Math.cos(angle))+'%';node.style.top=(50+34*Math.sin(angle))+'%';}
  node.querySelector('.speaker').textContent=name;node.querySelector('.name').textContent=name;node.querySelector('.message').textContent=row?.message||'';
  const active=visible.find(r=>r.agent===name);
@@ -104,7 +104,7 @@ function drawRobots(){
   const ratio=window.devicePixelRatio||1;
   canvas.width=Math.round(rect.width*ratio);canvas.height=Math.round(rect.height*ratio);
   const ctx=canvas.getContext('2d');ctx.scale(canvas.width/140,canvas.height/140);
-  const style=getComputedStyle(agent),color=style.getPropertyValue('--agent-color').trim()||'#287c9d';
+  const style=getComputedStyle(agent),color=getComputedStyle(agent.querySelector('.bubble')).backgroundColor||'#c4e0eb';
   const face=style.getPropertyValue('--bubble-ink').trim()||'#fff';
   const active=agent.classList.contains('is-active');
   ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=2.5;ctx.lineCap='round';ctx.lineJoin='round';

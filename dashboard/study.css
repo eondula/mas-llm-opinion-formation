@@ -51,10 +51,10 @@ main{padding:30px 36px}.context{padding:5px 0 22px}.context h2{font-size:32px;fo
 #experiment .context{padding-top:0}
 @media(max-width:850px){.run-progress{grid-template-columns:auto minmax(0,1fr);gap:10px 16px}.run-progress #timing{grid-column:1/-1;white-space:normal}}
 /* Message bubbles and faces share their agent's plot color. */
-#arena .agent{--bubble-ink:#fff}
-[data-theme=dark] #arena .agent{--bubble-ink:#171b23}
+#arena .agent{--bubble-ink:#172333;--agent-fill:color-mix(in srgb,var(--agent-color) 35%,white)}
+[data-theme=dark] #arena .agent{--bubble-ink:#172333;--agent-fill:color-mix(in srgb,var(--agent-color) 55%,white)}
 #arena .agent .bubble,
-#arena .agent .bubble::after{background:var(--agent-color);border-color:var(--agent-color)!important;color:var(--bubble-ink)}
+#arena .agent .bubble::after{background:var(--agent-fill);border-color:var(--agent-fill)!important;color:var(--bubble-ink)}
 #arena .agent .bubble .speaker,
 #arena .agent .bubble .message{color:var(--bubble-ink)!important}
 #arena .agent .bubble .message::selection{background:var(--bubble-ink);color:var(--agent-color)}
@@ -76,3 +76,12 @@ main{padding:30px 36px}.context{padding:5px 0 22px}.context h2{font-size:32px;fo
 .agent-robot{display:block;width:100%;height:100%}
 #arena .agent:has(.circle.s1) .strategy-label{color:var(--s1)}
 #arena .agent:has(.circle.s2) .strategy-label{color:var(--s2)}
+
+/* Move the illustration only, keeping messages and layout steady. */
+@keyframes robot-bob {
+  0%,100% { transform:translateY(0) rotate(-2deg); }
+  50% { transform:translateY(-7px) rotate(2deg); }
+}
+.agent-robot{animation:robot-bob 4.5s ease-in-out infinite;animation-delay:var(--motion-delay,0s);transform-origin:50% 75%}
+.is-active .agent-robot{animation-duration:3s}
+@media(prefers-reduced-motion:reduce){.agent-robot{animation:none!important}}
