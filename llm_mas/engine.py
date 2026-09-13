@@ -19,6 +19,7 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
         if config['schedule'] == 'reverse_sequential': order.reverse()
         for i in order:
             runtime = runtimes[models[i]]
+            runtime.interaction_context = dict(scenario=scenario['id'], agent=names[i], round=t, stage='before')
             before = runtime.measure(histories[i], scenario, texts)
             deliveries = []
             if t and config['schedule'] != 'no_peer':
@@ -33,6 +34,7 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
                 histories[i].append({'role':'user','content':texts['starting_assessment'].format(candidate=scenario[f'strategy_{strategy}']['candidate'])})
                 decision = None
             else:
+                runtime.interaction_context['stage'] = 'decision'
                 with decision_context(t, names[i], runtime, histories[i]) if decision_context else nullcontext():
                     decision = before if t == 0 else runtime.measure(histories[i], scenario, texts)
                 strategy = 1 if decision['margin'] >= 0 else 2
@@ -44,6 +46,7 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
                 sampling = dict(config['sampling'])
                 sampling['seed'] += t*n+i
                 generation_options['sampling'] = sampling
+            runtime.interaction_context['stage'] = 'response'
             generation = None
             argument_selection = None
             argument_index = None
@@ -87,6 +90,7 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
             message = generation['output'] if autonomous else selected['candidate']+'\n'+argument
             messages[i] = message
             histories[i].append({'role':'assistant','content':message})
+            runtime.interaction_context['stage'] = 'post'
             post = runtime.measure(histories[i], scenario, texts)
             row = dict(round=t, agent=names[i], model=models[i], strategy=strategy, forced=forced,
                        before=before, decision=decision, post=post, message=message, argument=argument, choice_status=choice_status,

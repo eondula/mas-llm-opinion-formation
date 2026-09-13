@@ -398,3 +398,17 @@ adding special tokens again, including during candidate scoring. Existing
 checkpoint tokenization is unchanged for reproducibility. Validate output
 format and context capacity with a short preview before a full study;
 TinyLlama's limited context is particularly relevant for long conversations.
+
+### SmolLM3 3B
+
+`HuggingFaceTB/SmolLM3-3B` is available in both dashboard model selectors and
+in the `models` list of study configurations. It is public and requires no
+Hugging Face authentication. Its default context capacity is 65,536 tokens;
+no context scaling is enabled. Transformers 4.53 or newer is required.
+
+The runtime disables extended thinking for this checkpoint with the documented
+`/no_think` system directive and `enable_thinking=False` chat template option.
+This applies consistently to generation and all candidate measurements.
+Original histories are preserved; saved rendered prompts include the directive.
+Existing study presets are unchanged. Run a short scored and generated preview
+on your server before launching a complete study.

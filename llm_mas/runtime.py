@@ -40,16 +40,41 @@ class Runtime:
         # Use the special tokens supplied by each new checkpoint's chat template.
         # Preserve historical tokenization for existing study checkpoints.
         if getattr(self, 'name', '') in (
-                'TinyLlama/TinyLlama-1.1B-Chat-v1.0', 'allenai/OLMo-2-0425-1B-Instruct'):
+                'TinyLlama/TinyLlama-1.1B-Chat-v1.0', 'allenai/OLMo-2-0425-1B-Instruct', 'HuggingFaceTB/SmolLM3-3B'):
             kwargs['add_special_tokens'] = False
         return self.tokenizer(text, **kwargs)
 
+    def check_context(self, input_tokens, reserve_tokens=0):
+        limit = getattr(self.model.config, 'max_position_embeddings', None)
+        if limit and input_tokens + reserve_tokens > limit:
+            context = getattr(self, 'interaction_context', {})
+            location = ', '.join(f'{key}={value}' for key, value in context.items())
+            raise ValueError(
+                f"Context exceeds model limit for {getattr(self, 'name', 'unknown model')}"
+                f" ({location or 'standalone call'}): input={input_tokens} tokens, "
+                f"reserved output={reserve_tokens}, limit={limit}. History was not truncated. "
+                "Use a checkpoint with a larger context window, or start a new run with "
+                "fewer rounds/agents or shorter messages. Lowering the output token budget "
+                "does not shorten history already accumulated.")
+
+    def render_chat(self, messages):
+        options = dict(tokenize=False, add_generation_prompt=True)
+        if getattr(self, 'name', '') == 'HuggingFaceTB/SmolLM3-3B':
+            # The model card specifies /no_think in the system message. Keep
+            # original histories intact and save the resulting rendered prompt.
+            messages = [dict(message) for message in messages]
+            if messages and messages[0]['role'] == 'system':
+                messages[0]['content'] += '\n/no_think'
+            else:
+                messages.insert(0, dict(role='system', content='/no_think'))
+            options['enable_thinking'] = False
+        return self.tokenizer.apply_chat_template(messages, **options)
+
     def inputs(self, messages, candidate=''):
         self.activate()
-        rendered = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        rendered = self.render_chat(messages)
         encoded = self.encode_rendered(rendered + candidate, return_tensors='pt').to(self.device)
-        limit = getattr(self.model.config, 'max_position_embeddings', None)
-        if limit and encoded.input_ids.shape[1] > limit: raise ValueError('Context exceeds model limit; history was not truncated')
+        self.check_context(encoded.input_ids.shape[1])
         return rendered, encoded
 
     def likelihood(self, messages, candidate, continuation_prefix=''):
@@ -83,6 +108,7 @@ class Runtime:
 
     def generate(self, messages, max_tokens, continuation_prefix='', sampling=None):
         rendered, inputs = self.inputs(messages, continuation_prefix)
+        self.check_context(inputs.input_ids.shape[1], reserve_tokens=max_tokens)
         options = dict(do_sample=bool(sampling), num_beams=1)
         if sampling:
             self.torch.manual_seed(sampling['seed'])

@@ -27,3 +27,21 @@ class CheckpointTests(unittest.TestCase):
         for names in ([MODELS[0]], [MODELS[1]], list(MODELS)):
             config = resolve(dict(agents=2,models=names))
             self.assertEqual(config['models'], names)
+
+    def test_smollm3_non_thinking_preserves_history(self):
+        from copy import deepcopy
+        from types import SimpleNamespace
+        runtime = Runtime.__new__(Runtime)
+        runtime.name = 'HuggingFaceTB/SmolLM3-3B'
+        runtime.tokenizer = SimpleNamespace(apply_chat_template=lambda messages, **options: (messages, options))
+        for history in ([dict(role='user',content='Task')],
+                        [dict(role='system',content='Persona'),dict(role='user',content='Task')]):
+            original = deepcopy(history)
+            messages, options = runtime.render_chat(history)
+            self.assertEqual(history, original)
+            self.assertEqual(messages[0]['role'], 'system')
+            self.assertTrue(messages[0]['content'].endswith('/no_think'))
+            self.assertFalse(options['enable_thinking'])
+        runtime.tokenizer = lambda text, **kwargs: kwargs
+        self.assertFalse(runtime.encode_rendered('rendered')['add_special_tokens'])
+        self.assertEqual(resolve(dict(models=[runtime.name]))['models'], [runtime.name])
