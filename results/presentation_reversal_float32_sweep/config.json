@@ -1,0 +1,13 @@
+{
+  "procedure": "scored",
+  "anchor": "final_prompt_token_after_block",
+  "cases": [
+    {
+      "name": "changed",
+      "agent": "Agent A",
+      "forward": "results/studies/full_behavioral_v2/conversations/000_000.json",
+      "reversed": "results/studies/full_reversed_v3/conversations/000_000.json"
+    }
+  ],
+  "reference": "results/presentation_reversal_patching/patches.csv"
+}
