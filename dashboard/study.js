@@ -218,7 +218,7 @@ function syncModels(){
  $('model-help').textContent=mixed?'Choose any available model for each agent. Models may repeat across agents, including groups of four or more.':'All agents share this checkpoint and maintain separate histories.';
 }
 function modelControls(){
- const available=['Qwen/Qwen2.5-1.5B-Instruct','Qwen/Qwen2.5-3B-Instruct','HuggingFaceTB/SmolLM2-1.7B-Instruct'];
+ const available=['Qwen/Qwen2.5-1.5B-Instruct','Qwen/Qwen2.5-3B-Instruct','HuggingFaceTB/SmolLM2-1.7B-Instruct','TinyLlama/TinyLlama-1.1B-Chat-v1.0','allenai/OLMo-2-0425-1B-Instruct'];
  const mixed=$('agent-configuration').value==='heterogeneous',box=$('agent-models');
  const previous=[...box.querySelectorAll('select')].map(s=>s.value);
  if(!$('shared-model').options.length)available.forEach(m=>$('shared-model').add(new Option(m,m)));

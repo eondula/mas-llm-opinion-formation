@@ -36,10 +36,18 @@ class Runtime:
             if other is not self and next(other.model.parameters()).device.type!='cpu':other.model.to('cpu')
         self.model.to(self.device)
 
+    def encode_rendered(self, text, **kwargs):
+        # Use the special tokens supplied by each new checkpoint's chat template.
+        # Preserve historical tokenization for existing study checkpoints.
+        if getattr(self, 'name', '') in (
+                'TinyLlama/TinyLlama-1.1B-Chat-v1.0', 'allenai/OLMo-2-0425-1B-Instruct'):
+            kwargs['add_special_tokens'] = False
+        return self.tokenizer(text, **kwargs)
+
     def inputs(self, messages, candidate=''):
         self.activate()
         rendered = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        encoded = self.tokenizer(rendered + candidate, return_tensors='pt').to(self.device)
+        encoded = self.encode_rendered(rendered + candidate, return_tensors='pt').to(self.device)
         limit = getattr(self.model.config, 'max_position_embeddings', None)
         if limit and encoded.input_ids.shape[1] > limit: raise ValueError('Context exceeds model limit; history was not truncated')
         return rendered, encoded
@@ -47,7 +55,7 @@ class Runtime:
     def likelihood(self, messages, candidate, continuation_prefix=''):
         rendered, encoded = self.inputs(messages, continuation_prefix + candidate)
         rendered += continuation_prefix
-        prefix=self.tokenizer(rendered)['input_ids']
+        prefix=self.encode_rendered(rendered)['input_ids']
         start = len(prefix)
         if encoded.input_ids[0,:start].tolist()!=prefix:raise ValueError('Candidate changes prompt token boundary')
         with self.torch.inference_mode():
@@ -69,7 +77,7 @@ class Runtime:
         l2, t2, _ = self.likelihood(messages, c2)
         margin = l1-l2
         return dict(margin=margin, stance=math.tanh(margin/2), likelihoods=[l1,l2], token_log_probs=[t1,t2],
-                    candidate_tokens=[self.tokenizer.convert_ids_to_tokens(self.tokenizer(rendered+c)['input_ids'][len(self.tokenizer(rendered)['input_ids']):]) for c in (c1,c2)],
+                    candidate_tokens=[self.tokenizer.convert_ids_to_tokens(self.encode_rendered(rendered+c)['input_ids'][len(self.encode_rendered(rendered)['input_ids']):]) for c in (c1,c2)],
                     token_counts=[len(t1),len(t2)], normalized_margin=l1/len(t1)-l2/len(t2) if t1 and t2 else None,
                     rendered_prompt=rendered, probe=probe)
 

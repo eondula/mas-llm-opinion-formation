@@ -383,3 +383,18 @@ the dashboard keep greedy decoding. Existing runs are unaffected by UI changes.
 See [the full experiment run guide](docs/full_experiment_run.md) for the smoke test,
 full runs, separate controls and analysis commands. Presets select CUDA/MPS/CPU
 automatically. Full runs use a maximum of 15 update rounds.
+
+### Additional 1B checkpoints
+
+The dashboard shared and per-agent model selectors include
+`TinyLlama/TinyLlama-1.1B-Chat-v1.0` and `allenai/OLMo-2-0425-1B-Instruct`.
+Both are public checkpoints loadable through Transformers without Hugging Face
+authentication. Model weights download on first use. They can also be supplied
+in the `models` list of a study configuration. Existing study presets retain
+their original checkpoint assignments.
+
+Both use their own tokenizer chat templates. Rendered chat is tokenized without
+adding special tokens again, including during candidate scoring. Existing
+checkpoint tokenization is unchanged for reproducibility. Validate output
+format and context capacity with a short preview before a full study;
+TinyLlama's limited context is particularly relevant for long conversations.
