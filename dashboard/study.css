@@ -99,3 +99,17 @@ main{padding:30px 36px}.context{padding:5px 0 22px}.context h2{font-size:32px;fo
 #joint-decision-status,#joint-decision-positions{margin:12px 18px;overflow-wrap:anywhere}
 #joint-decision-positions p{padding-top:10px;border-top:1px solid var(--edge)}
 #experiment .plot-column{position:static;max-height:none;overflow:visible}
+
+/* A compact terminal window, independent of the page theme. */
+#closure-log{background:#101722;border-color:#354153;box-shadow:0 5px 18px #0002}
+#closure-log h2{display:flex;align-items:center;gap:12px;background:#202a38;color:#eef3ff;border-bottom-color:#354153;font:600 13px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace}
+.terminal-lights{display:flex;gap:5px}
+.terminal-lights i{width:8px;height:8px;border-radius:50%;background:#ff6961}
+.terminal-lights i:nth-child(2){background:#f4c052}
+.terminal-lights i:nth-child(3){background:#52c98b}
+.terminal-caption{margin-left:auto;color:#a8b4cc;font-size:11px;font-weight:400}
+#closure-log .closure-terminal{box-sizing:border-box;height:200px;max-height:200px;overflow-y:auto;background:#101722;color:#e4eaf2;--plot-1:#ff9a32;--plot-2:#39ff88;--plot-3:#ffd166;--plot-4:#bbff45}
+#closure-log .closure-round{color:#eef3ff}
+#closure-log .closure-note{color:#a8b4cc}
+#closure-log .closure-entry{border-left:2px solid currentColor;padding-left:10px;margin:4px 0}
+@media(max-width:600px){.terminal-caption{display:none}}
