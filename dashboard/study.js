@@ -163,7 +163,7 @@ $('follow').onclick=()=>{following=true;$('follow').textContent='Following live'
 $('condition').onchange=()=>{selectedTask=$('condition').value;following=false;lastIndex=events.map(e=>e.task).lastIndexOf(selectedTask);draw(lastIndex);};
 $('play').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('play').textContent='Play responses';return;}following=false;const indices=events.map((e,i)=>e.task===selectedTask?i:-1).filter(i=>i>=0);let at=0;timer=setInterval(()=>{if(at>=indices.length){clearInterval(timer);timer=null;$('play').textContent='Play responses';return;}lastIndex=indices[at++];$('checkpoint').value=lastIndex;draw(lastIndex);},Number($('playback-speed').value));$('play').textContent='Pause';};
 let polling=false;
-async function poll(){if(polling)return;polling=true;try{const d=await api('status'+($('saved-run').value?'?run_id='+encodeURIComponent($('saved-run').value):''));activeConfig=d.config;activeTasks=d.tasks||[];$('closure-log').hidden=!(d.closure_events||[]).length;$('closure-log-text').textContent=(d.closure_events||[]).map(e=>`Round ${e.round}: ${e.reason||'Discussion continues'}\n${e.unavailable||''}`+[...e.proposals.map(v=>({...v,phase:'Proposal'})),...e.confirmations.map(v=>({...v,phase:'Confirmation'}))].map(v=>`\n${v.agent} · ${v.phase}: ${v.valid?v.action:'Invalid signal'} — ${v.reason||'No valid reason'}`).join('')).join('\n\n');$('zip-download').hidden=!d.run_id;$('zip-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/paper_outputs.zip';$('figure-download').hidden=!d.run_id;$('figure-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/figures/index.html';updateHeading();$('connection').textContent='Connected';$('run-state').textContent=d.status.phase+(d.status.termination?.reason ? ' · '+(({system_detected_stability:'System-detected stability',system_detected_repetition:'System-detected repetition',agents_accepted_closure:'Agents accepted closure',budget_exhausted:'Round budget exhausted',max_rounds:'Maximum rounds reached',all_agents_finished:'All agents finished (legacy)'})[d.status.termination.reason]||d.status.termination.reason)+' (round '+d.status.termination.round+')':'');$('progress').textContent=`${d.status.completed||0} / ${d.status.total||0}`;$('study-progress').max=d.status.total||1;$('study-progress').value=d.status.completed||0;$('timing').textContent=`Elapsed ${Math.round(d.status.elapsed_seconds||0)}s · ETA ${d.status.estimated_remaining_seconds==null?'estimating':Math.round(d.status.estimated_remaining_seconds)+'s'}`;$('run').disabled=d.running;$('stop').disabled=!d.can_stop;
+async function poll(){if(polling)return;polling=true;try{const d=await api('status'+($('saved-run').value?'?run_id='+encodeURIComponent($('saved-run').value):''));activeConfig=d.config;activeTasks=d.tasks||[];renderClosureLog(d.closure_events||[]);$('zip-download').hidden=!d.run_id;$('zip-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/paper_outputs.zip';$('figure-download').hidden=!d.run_id;$('figure-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/figures/index.html';updateHeading();$('connection').textContent='Connected';$('run-state').textContent=d.status.phase+(d.status.termination?.reason ? ' · '+(({system_detected_stability:'System-detected stability',system_detected_repetition:'System-detected repetition',agents_accepted_closure:'Agents accepted closure',budget_exhausted:'Round budget exhausted',max_rounds:'Maximum rounds reached',all_agents_finished:'All agents finished (legacy)'})[d.status.termination.reason]||d.status.termination.reason)+' (round '+d.status.termination.round+')':'');$('progress').textContent=`${d.status.completed||0} / ${d.status.total||0}`;$('study-progress').max=d.status.total||1;$('study-progress').value=d.status.completed||0;$('timing').textContent=`Elapsed ${Math.round(d.status.elapsed_seconds||0)}s · ETA ${d.status.estimated_remaining_seconds==null?'estimating':Math.round(d.status.estimated_remaining_seconds)+'s'}`;$('run').disabled=d.running;$('stop').disabled=!d.can_stop;
  if(d.running && !d.events.length) {
   $('title').textContent='Preparing the conversation…';
   $('description').textContent=d.status.log_tail?.trim().split(/\r?\n/).filter(Boolean).at(-1)||('Loading '+(d.status.model||'model')+' · first response pending');
@@ -303,4 +303,27 @@ function drawJointSheet(subset, settings, n, current) {
  const label=final?'Final recorded choices':'Current recorded choices';
  $('joint-decision-status').textContent=`${label}${round==null?'':` · round ${round}`}: `+(!complete?'Waiting for all agents.':!valid?'Incomplete: invalid choice recorded.':shared?`Shared recommendation — Strategy ${rows[0].strategy}.`:'Unresolved disagreement.')+(settings.schedule==='no_peer'?' No peer exchange.':'')+' This sheet compiles individual choices; it is not a separately ratified agreement.';
  for(const row of rows){const p=document.createElement('p');const choice=scenario?.[`strategy_${row.strategy}`]?.candidate||'Invalid choice';p.textContent=`${row.agent}: ${choice}\nReason: ${row.argument||row.message}`;p.style.whiteSpace='pre-wrap';box.append(p);}
+}
+
+function renderClosureLog(entries) {
+ const panel=$('closure-log'),box=$('closure-log-text');
+ panel.hidden=!entries.length;
+ const signature=JSON.stringify(entries);
+ if(box.dataset.entries===signature)return;
+ const atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<24;
+ box.dataset.entries=signature;box.replaceChildren();
+ const append=(text,className,color)=>{const line=document.createElement('div');line.className=className;line.textContent=text;if(color)line.style.color=color;box.append(line);};
+ for(const entry of entries){
+  const reason={agents_accepted_closure:'Agents accepted closure',budget_exhausted:'Round budget exhausted'}[entry.reason]||entry.reason||'Discussion continues';
+  append(`Round ${entry.round} · ${reason}`,'closure-round');
+  if(entry.unavailable)append(entry.unavailable,'closure-note');
+  for(const [phase,label] of [['proposals','Proposal'],['confirmations','Confirmation']]){
+   for(const vote of entry[phase]||[]){
+    const match=/^Agent ([A-Z]|[0-9]+)$/.exec(vote.agent||'');
+    const index=match?(/^[A-Z]$/.test(match[1])?match[1].charCodeAt(0)-65:Number(match[1])-1):null;
+    append(`${vote.agent} · ${label}: ${vote.valid?vote.action:'Invalid closure format'} — ${vote.reason||'No valid reason'}`,'closure-entry',index===null?'var(--muted)':agentColor(index));
+   }
+  }
+ }
+ if(atBottom)box.scrollTop=box.scrollHeight;
 }

@@ -85,3 +85,17 @@ main{padding:30px 36px}.context{padding:5px 0 22px}.context h2{font-size:32px;fo
 .agent-robot{animation:robot-bob 4.5s ease-in-out infinite;animation-delay:var(--motion-delay,0s);transform-origin:50% 75%}
 .is-active .agent-robot{animation-duration:3s}
 @media(prefers-reduced-motion:reduce){.agent-robot{animation:none!important}}
+
+/* Stack the conversation, full-width result panels, and plots. */
+#experiment .discussion-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+#experiment .discussion-layout> *{min-width:0;width:100%}
+#closure-log,#joint-decision-sheet{background:var(--surface);border:1px solid var(--edge);border-radius:12px;overflow:hidden}
+#closure-log h2,#joint-decision-sheet h2{font-size:17px;margin:0;padding:12px 18px;border-bottom:1px solid var(--edge)}
+.closure-terminal{height:220px;overflow:auto;padding:12px 18px;background:var(--paper);font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.closure-round{color:var(--ink);font-weight:700;margin:12px 0 5px}
+.closure-round:first-child{margin-top:0}
+.closure-entry{padding:2px 0}
+.closure-note{color:var(--muted)}
+#joint-decision-status,#joint-decision-positions{margin:12px 18px;overflow-wrap:anywhere}
+#joint-decision-positions p{padding-top:10px;border-top:1px solid var(--edge)}
+#experiment .plot-column{position:static;max-height:none;overflow:visible}
