@@ -222,7 +222,7 @@ function syncModels(){
  if(models.includes('allenai/OLMo-2-0425-1B-Instruct')) $('model-help').textContent+=' OLMo has a 4,096-token context window. Long conversations may exceed its capacity.';
 }
 function modelControls(){
- const available=['Qwen/Qwen2.5-1.5B-Instruct','Qwen/Qwen2.5-3B-Instruct','HuggingFaceTB/SmolLM2-1.7B-Instruct','TinyLlama/TinyLlama-1.1B-Chat-v1.0','allenai/OLMo-2-0425-1B-Instruct','HuggingFaceTB/SmolLM3-3B'];
+ const available=['Qwen/Qwen2.5-1.5B-Instruct','Qwen/Qwen2.5-3B-Instruct','HuggingFaceTB/SmolLM2-1.7B-Instruct','TinyLlama/TinyLlama-1.1B-Chat-v1.0','allenai/OLMo-2-0425-1B-Instruct','HuggingFaceTB/SmolLM3-3B','Qwen/Qwen3-4B-Instruct-2507', 'microsoft/Phi-4-mini-instruct'];
  const mixed=$('agent-configuration').value==='heterogeneous',box=$('agent-models');
  const previous=[...box.querySelectorAll('select')].map(s=>s.value);
  if(!$('shared-model').options.length)available.forEach(m=>$('shared-model').add(new Option(m,m)));

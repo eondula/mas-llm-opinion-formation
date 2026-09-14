@@ -3,7 +3,7 @@ import unittest
 from llm_mas.runtime import Runtime
 from llm_mas.config import resolve
 
-MODELS = ('TinyLlama/TinyLlama-1.1B-Chat-v1.0', 'allenai/OLMo-2-0425-1B-Instruct')
+MODELS = ('TinyLlama/TinyLlama-1.1B-Chat-v1.0', 'allenai/OLMo-2-0425-1B-Instruct', 'Qwen/Qwen3-4B-Instruct-2507', 'microsoft/Phi-4-mini-instruct')
 
 class CheckpointTests(unittest.TestCase):
     def test_rendered_tokens_do_not_duplicate_special_tokens(self):
@@ -24,7 +24,7 @@ class CheckpointTests(unittest.TestCase):
         self.assertEqual(runtime.encode_rendered('text'), {})
 
     def test_new_model_assignments_resolve(self):
-        for names in ([MODELS[0]], [MODELS[1]], list(MODELS)):
+        for names in [[name] for name in MODELS] + [list(MODELS[-2:])]:
             config = resolve(dict(agents=2,models=names))
             self.assertEqual(config['models'], names)
 

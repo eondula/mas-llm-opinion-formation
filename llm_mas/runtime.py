@@ -40,7 +40,7 @@ class Runtime:
         # Use the special tokens supplied by each new checkpoint's chat template.
         # Preserve historical tokenization for existing study checkpoints.
         if getattr(self, 'name', '') in (
-                'TinyLlama/TinyLlama-1.1B-Chat-v1.0', 'allenai/OLMo-2-0425-1B-Instruct', 'HuggingFaceTB/SmolLM3-3B'):
+                'TinyLlama/TinyLlama-1.1B-Chat-v1.0', 'allenai/OLMo-2-0425-1B-Instruct', 'HuggingFaceTB/SmolLM3-3B', 'Qwen/Qwen3-4B-Instruct-2507', 'microsoft/Phi-4-mini-instruct'):
             kwargs['add_special_tokens'] = False
         return self.tokenizer(text, **kwargs)
 
