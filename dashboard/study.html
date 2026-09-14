@@ -1,14 +1,67 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: MIT -->
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Opinion Lab</title><link rel="stylesheet" href="/styles.css"><script defer src="/study.js"></script><link rel="stylesheet" href="/study.css"><link rel="stylesheet" href="/site.css"></head>
-<body><header class="site-header"><h1>Opinion Lab</h1><nav class="top-nav" aria-label="Main navigation"><a href="/" aria-current="page">Run experiment</a><a href="/analyze.html">Analyze experiment</a><a href="/docs.html">Docs</a></nav><button id="theme-toggle" type="button">Dark theme</button></header>
-<div class="app-layout"><aside class="sidebar"><section id="setup"><h2>Run an experiment</h2><div class="setup-grid">
-<label for="run-id">Run ID (optional)</label><input id="run-id" placeholder="Current system date and time"><label>Run mode<select id="mode"><option value="preview">Quick preview</option><option value="joint_task">Joint decision task</option><option value="study">Study</option><option value="no_fixed_rounds">No fixed rounds</option></select></label>
-<div id="joint-task-controls" hidden><label>Team task<textarea id="joint-task-brief" maxlength="3000" rows="5">Submit one team recommendation choosing one of the two options for the scenario. Explain why its benefits justify its main drawback. Address a specific concern raised by another agent when peer messages are available. If you cannot agree, record the competing recommendations and the unresolved tradeoff.</textarea></label><label>Stopping policy<select id="joint-stopping"><option value="fixed">Fixed rounds</option><option value="sign_stability">Adaptive stability</option><option value="agent_closure">Agent-negotiated closure</option></select></label><p>Agent-negotiated closure uses a separate proposal and confirmation phase after each update round. All agents must accept the same proposal; disagreement may remain. With No peer, no closure messages are exchanged and the round limit applies. All controls remain available. Fixed-list arguments restrict what agents can express. No peer is a control with no exchange; matching choices alone do not demonstrate collaboration.</p></div>
-<label id="preview-preset-label">Quick preview preset<select id="preview-preset"><option value="no_persona">No persona</option><option value="persona">Persona</option></select></label><p id="persona-help" hidden>Scenario roles alternate by agent: A/C/etc. prioritize Strategy 1’s attribute; B/D/etc. prioritize Strategy 2’s attribute. Roles persist, but choices can change. All settings below remain editable.</p>
+<html lang="en"><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Opinion Lab</title><link rel="stylesheet" href="/styles.css">
+    <script defer src="/study.js"></script><link rel="stylesheet" href="/study.css">
+    <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+    <header class="site-header">
+        <h1>Opinion Lab</h1>
+        <nav class="top-nav" aria-label="Main navigation">
+            <a href="/" aria-current="page">Run experiment</a>
+            <a href="/analyze.html">Analyze experiment</a>
+            <a href="/docs.html">Docs</a>
+        </nav>
+        <button id="theme-toggle" type="button">Dark theme</button>
+    </header>
+<div class="app-layout">
+    <aside class="sidebar">
+        <section id="setup">
+            <h2>Run an experiment</h2>
+            <div class="setup-grid">
+                <label for="run-id">Run ID (optional)</label>
+                <input id="run-id" placeholder="Current system date and time">
+                <label>Run mode
+                <select id="mode">
+                    <option value="preview">Quick preview</option>
+                    <option value="joint_task">Joint decision task</option>
+                    <option value="study">Study</option>
+                    <option value="no_fixed_rounds">No fixed rounds</option>
+                </select>
+            </label>
+            <div id="joint-task-controls" hidden>
+                <label>Team task
+                    <textarea id="joint-task-brief" maxlength="3000" rows="5">Submit one team recommendation choosing one of the two options for
+                    the scenario. Explain why its benefits justify its main drawback.
+                    Address a specific concern raised by another agent when peer messages
+                    are available. If you cannot agree, record the competing recommendations
+                    and the unresolved tradeoff.
+                </textarea>
+            </label>
+            <label>Stopping policy
+                <select id="joint-stopping">
+                    <option value="fixed">Fixed rounds</option>
+                    <option value="sign_stability">Adaptive stability</option>
+                    <option value="agent_closure">Agent-negotiated closure</option>
+                </select>
+            </label>
+            <p>Agent-negotiated closure uses a separate proposal and confirmation
+                phase after each update round. All agents must accept the same
+                proposal; disagreement may remain. With No peer, no closure messages
+                are exchanged and the round limit applies. All controls remain available.
+                Fixed-list arguments restrict what agents can express.
+                No peer is a control with no exchange; matching choices
+                alone do not demonstrate collaboration.
+            </p>
+        </div>
+        <label id="preview-preset-label">Quick preview preset
+            <select id="preview-preset">
+                <option value="no_persona">No persona</option><option value="persona">Persona</option></select></label><p id="persona-help" hidden>Scenario roles alternate by agent: A/C/etc. prioritize Strategy 1’s attribute; B/D/etc. prioritize Strategy 2’s attribute. Roles persist, but choices can change. All settings below remain editable.</p>
 <label>Agents<input id="agents" type="number" min="2" value="2"></label>
 <label>Agent configuration<select id="agent-configuration"><option value="homogeneous">Homogeneous · shared checkpoint</option><option value="heterogeneous">Heterogeneous · choose per agent</option></select></label><label id="shared-model-label">Shared model<select id="shared-model"></select></label><div id="agent-models" hidden></div><p id="model-help"></p><textarea id="models" hidden aria-hidden="true"></textarea>
-<label>Scenarios<select id="scenarios" multiple size="5"></select></label>
+<label>Scenarios<select id="scenarios" multiple size="5"></select></label><button id="selected-scenario-info" class="control-help" type="button">Scenario details ↗</button>
 <label><span id="rounds-label">Update rounds after initialization</span><input id="rounds" type="number" min="1" value="20"></label>
 <p id="stopping-help" hidden>After each complete update round, stops when every agent keeps its strategy, message cosine similarity is at least 0.8, and its post-response margin stays on the same side of zero (zero counts as positive). No minimum rounds. The maximum remains a safeguard.</p>
 <label for="initialization">Starting strategies</label><select id="initialization"><option value="natural">Natural</option><option value="forced">Forced</option></select><div id="forced-strategies" hidden></div>
@@ -30,7 +83,7 @@
 <label><input name="research" type="checkbox" value="validation"> Measurement checks (study)</label><label><input name="research" type="checkbox" value="history"> Controlled histories (study)</label><label for="saved-run">Saved runs</label><select id="saved-run"><option value="">Active run</option></select><a id="zip-download" hidden>Download figures and tables ZIP</a><a id="figure-download" hidden target="_blank">View saved figures</a><button id="preview-prompts">Preview prompts</button><button id="run">Start run</button><button id="stop">Stop</button><p id="error" role="alert"></p>
 <button id="new-scenario" type="button">Create scenario</button>
 </div></section></aside><main id="experiment"><section class="run-progress" aria-label="Run progress"><div class="status"><span id="connection" class="badge">Connecting…</span><strong id="run-state">Starting</strong><span id="progress">No results yet</span></div><progress id="study-progress" max="1" value="0"></progress><p id="timing"></p></section>
-<section class="context"><div><h2 id="title">The agents are getting ready.</h2><p id="description">Keep this page open while the model loads. Closing it will not stop the experiment.</p></div><span class="round" id="round">Round —</span></section>
+<section class="context"><div><h2><button id="title" class="scenario-title-link" type="button" aria-haspopup="dialog">Scenario details</button></h2><p id="description">Keep this page open while the model loads. Closing it will not stop the experiment.</p></div><span class="round" id="round">Round —</span></section>
 <div class="discussion-layout"><div class="discussion-column"><div class="key"><span class="dot s1"></span>S1 <span class="dot s2"></span>S2 <span>Outer ring shows strategy; fill color identifies the checkpoint.</span></div>
 <section id="arena" class="arena" aria-label="Agent discussion"><canvas id="exchange-canvas" aria-hidden="true"></canvas><article class="agent left" id="agent-a"><div class="bubble"><span class="speaker">Agent A</span><p class="message" tabindex="0" aria-label="Agent response"></p></div><small class="activity" role="status">Waiting</small><div class="circle unknown"><canvas class="agent-robot" width="140" height="140" aria-hidden="true"></canvas></div><span class="name">Agent A</span><span class="strategy-label">No strategy yet</span><span class="forced"></span></article><div class="exchange"><p id="delivery" hidden></p></div><article class="agent right" id="agent-b"><div class="bubble"><span class="speaker">Agent B</span><p class="message" tabindex="0" aria-label="Agent response"></p></div><small class="activity" role="status">Waiting</small><div class="circle unknown"><canvas class="agent-robot" width="140" height="140" aria-hidden="true"></canvas></div><span class="name">Agent B</span><span class="strategy-label">No strategy yet</span><span class="forced"></span></article></section>
 <section id="diagnostic" hidden><h3>Controlled measurement</h3><p>These are diagnostic contexts, not a two-agent conversation.</p><div id="diagnostic-values"></div></section>
@@ -38,4 +91,4 @@
 </div><section id="closure-log" hidden><h2><span class="terminal-lights" aria-hidden="true"><i></i><i></i><i></i></span>Conversation closure <span class="terminal-caption">Agent control log</span></h2><div id="closure-log-text" class="closure-terminal" role="log" aria-label="Agent closure responses" tabindex="0"></div></section>
 <section id="joint-decision-sheet" hidden aria-live="polite"><h2>Team decision sheet</h2><p id="joint-decision-status"></p><div id="joint-decision-positions"></div></section>
 <aside class="plot-column" aria-label="Experiment plots"><section class="charts"><article><div class="chart-heading"><h3>Stance trajectory</h3><span>After own response · S2 −1 → S1 +1</span></div><div id="stance-chart" class="chart"><p>Available when this condition completes.</p></div></article><article><div class="chart-heading"><h3>Sentiment trajectory</h3><span>Public wording · negative −1 → positive +1</span></div><div id="sentiment-chart" class="chart"><p>Sentiment pending. Scored after conversations and research analyses.</p></div></article></section>
-<div class="legend"><span class="line agent-a"></span>Agent A <span class="line agent-b"></span>Agent B</div></aside></div><section class="toolbar"><div><label for="condition">Experiment / condition</label><select id="condition"><option>Waiting for the first condition…</option></select></div><button id="follow" type="button">Following live</button></section><p id="warning" role="status"></p></main></div><footer>LLM-MAS Opinion Formation</footer><dialog id="prompt-dialog" aria-labelledby="prompt-title"><div class="dialog-heading"><h2 id="prompt-title">Prompt preview</h2><button id="close-prompt" type="button">Close</button></div><pre id="prompt"></pre></dialog><dialog id="scenario-dialog" aria-labelledby="scenario-title"><form id="scenario-form"><div class="dialog-heading"><h2 id="scenario-title">Create scenario</h2><button id="close-scenario" type="button">Close</button></div><p>Define two alternatives. Candidate statements are scored directly; arguments are used in predefined-message runs.</p><button id="scenario-template" type="button">Fill from selected scenario</button><div class="scenario-fields"><label>Scenario ID<input name="id" required pattern="[A-Za-z0-9_-]+" placeholder="my_scenario"></label><label>Title<input name="title" required placeholder="The decision or tradeoff"></label><fieldset><legend>Strategy 1</legend><label>Strategy name<input name="strategy_1.name" required></label><label>First property<input name="strategy_1.property_1" required></label><label>Second property<input name="strategy_1.property_2" required></label><label>Candidate statement<textarea name="strategy_1.candidate" required></textarea></label><label>Arguments (one per line)<textarea name="strategy_1.arguments" required></textarea></label></fieldset><fieldset><legend>Strategy 2</legend><label>Strategy name<input name="strategy_2.name" required></label><label>First property<input name="strategy_2.property_1" required></label><label>Second property<input name="strategy_2.property_2" required></label><label>Candidate statement<textarea name="strategy_2.candidate" required></textarea></label><label>Arguments (one per line)<textarea name="strategy_2.arguments" required></textarea></label></fieldset></div><p id="scenario-error" role="alert"></p><button type="submit">Save and select scenario</button></form></dialog></body></html>
+<div class="legend"><span class="line agent-a"></span>Agent A <span class="line agent-b"></span>Agent B</div></aside></div><section class="toolbar"><div><label for="condition">Experiment / condition</label><select id="condition"><option>Waiting for the first condition…</option></select></div><button id="follow" type="button">Following live</button></section><p id="warning" role="status"></p></main></div><footer>LLM-MAS Opinion Formation</footer><dialog id="prompt-dialog" aria-labelledby="prompt-title"><div class="dialog-heading"><h2 id="prompt-title">Prompt preview</h2><button id="close-prompt" type="button">Close</button></div><pre id="prompt"></pre></dialog><dialog id="scenario-dialog" aria-labelledby="scenario-title"><form id="scenario-form"><div class="dialog-heading"><h2 id="scenario-title">Create scenario</h2><button id="close-scenario" type="button">Close</button></div><p>Define two alternatives. Candidate statements are scored directly; arguments are used in predefined-message runs.</p><button id="scenario-template" type="button">Fill from selected scenario</button><div class="scenario-fields"><label>Scenario ID<input name="id" required pattern="[A-Za-z0-9_-]+" placeholder="my_scenario"></label><label>Title<input name="title" required placeholder="The decision or tradeoff"></label><fieldset><legend>Strategy 1</legend><label>Strategy name<input name="strategy_1.name" required></label><label>First property<input name="strategy_1.property_1" required></label><label>Second property<input name="strategy_1.property_2" required></label><label>Candidate statement<textarea name="strategy_1.candidate" required></textarea></label><label>Arguments (one per line)<textarea name="strategy_1.arguments" required></textarea></label></fieldset><fieldset><legend>Strategy 2</legend><label>Strategy name<input name="strategy_2.name" required></label><label>First property<input name="strategy_2.property_1" required></label><label>Second property<input name="strategy_2.property_2" required></label><label>Candidate statement<textarea name="strategy_2.candidate" required></textarea></label><label>Arguments (one per line)<textarea name="strategy_2.arguments" required></textarea></label></fieldset></div><p id="scenario-error" role="alert"></p><button type="submit">Save and select scenario</button></form></dialog><dialog id="info-dialog" aria-labelledby="info-title"><div class="info-heading"><h2 id="info-title"></h2><button id="info-close" type="button" aria-label="Close details">Close</button></div><div id="info-content"></div></dialog></body></html>

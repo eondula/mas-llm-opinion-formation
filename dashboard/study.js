@@ -1,7 +1,7 @@
 const $=id=>document.getElementById(id);let catalog=[],events=[],lastIndex=0;
 async function api(path,data){const r=await fetch('/api/'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{});const v=await r.json();if(!r.ok)throw Error(v.error);return v;}
 function config(){return {joint_task_brief:$('mode').value==='joint_task'?$('joint-task-brief').value.trim():undefined,stopping:$('mode').value==='joint_task'?$('joint-stopping').value:undefined,prompt_style:$('prompt-style').value,decision_mode:$('decision-mode').value,sampling_method:$('sampling-method').value,sampling:{temperature:Number($('temperature').value),top_p:Number($('top-p').value),seed:Number($('sampling-seed').value)},decoding:$('mode').value!=='study'?$('decoding').value:'greedy',preview_preset:$('mode').value!=='study'?$('preview-preset').value:undefined,paper_suite:$('mode').value==='study'&&$('paper-suite').checked,run_id:$('run-id').value.trim()||undefined,mode:$('mode').value,agents:Number($('agents').value),agent_configuration:$('agent-configuration').value,models:$('models').value.split('\n').map(s=>s.trim()).filter(Boolean),scenarios:[...$('scenarios').selectedOptions].map(o=>o.value),rounds:Number($('rounds').value),initialization:$('initialization').value==='natural'?'natural':[...$('forced-strategies').querySelectorAll('select')].map(el=>Number(el.value)),schedule:$('schedule').value,argument_mode:$('argument_mode').value,max_argument_tokens:Number($('max_argument_tokens').value),research:$('mode').value==='study'?[...document.querySelectorAll('[name=research]:checked')].map(x=>x.value):[],conditions:$('mode').value==='study'&&$('conditions').value.trim()?JSON.parse($('conditions').value):[]};}
-async function load(){catalog=await api('scenarios');$('scenarios').replaceChildren();for(const e of catalog){const name=e.path.split('/').pop().replace(/\.json$/,'').replace(/_/g,' ');const label=name.charAt(0).toUpperCase()+name.slice(1);const o=new Option(`${label} — ${e.data.title}`,e.path);o.title=e.data.title;o.selected=e.path.endsWith('/storage.json')||($('mode').value==='study'&&e.path.endsWith('/sensor.json'));$('scenarios').add(o);}}
+async function load(){catalog=await api('scenarios');$('scenarios').replaceChildren();for(const e of catalog){const name=e.path.split('/').pop().replace(/\.json$/,'').replace(/_/g,' ');const label=name.charAt(0).toUpperCase()+name.slice(1);const o=new Option(label,e.path);o.title=e.data.title;o.selected=e.path.endsWith('/storage.json')||($('mode').value==='study'&&e.path.endsWith('/sensor.json'));$('scenarios').add(o);}}
 function safe(fn){return async()=>{try{$('error').textContent='';await fn();}catch(e){$('error').textContent=e.message;}};}
 $('mode').onchange=()=>{$('agents').disabled=false;$('scenarios').multiple=$('mode').value==='study';safe(load)();};$('mode').onchange();
 function startingControls(){const box=$('forced-strategies'),previous=[...box.querySelectorAll('select')].map(el=>el.value);box.hidden=$('initialization').value!=='forced';box.replaceChildren();for(let i=0;i<Number($('agents').value);i++){const label=document.createElement('label');label.textContent=i<26?`Agent ${String.fromCharCode(65+i)}`:`Agent ${i+1}`;const select=document.createElement('select');select.id='forced-'+i;label.htmlFor=select.id;select.add(new Option('Strategy 1','1'));select.add(new Option('Strategy 2','2'));select.value=previous[i]||(i===0?'2':'1');box.append(label,select);}}
@@ -54,7 +54,7 @@ function updateHeading(){
  const [conditionIndex,scenarioIndex]=task.split('_').map(Number);
  const scenario=activeConfig?.scenarios?.[scenarioIndex];
  const settings=activeTasks[conditionIndex]||{...activeConfig,...activeConfig?.conditions?.[conditionIndex]};
- $('title').textContent=scenario?.title||'Conversation in progress';
+ $('title').textContent=scenario?scenarioLabel(scenario):'Scenario details';
  $('description').textContent=[settings.decision_mode==='generated'?'Generated choice':'Scored choice',settings.schedule?.replaceAll('_',' '),settings.initialization==='natural'?'Natural start':settings.initialization?'Forced start':null,settings.argument_mode?({predefined:'Predefined (cyclic)',agent_selected:'Conversational (fixed list)',combined_reasoning:'Combined prompt (flexible reasoning)',combined_fixed:'Combined prompt (fixed list)',generated:'Generated',conversational:'Conversational (generated)'}[settings.argument_mode]||settings.argument_mode)+' arguments':null].filter(Boolean).join(' · ');
 }
 // Shared identity colors for faces, messages, plot traces, and legends.
@@ -326,4 +326,41 @@ function renderClosureLog(entries) {
   }
  }
  if(atBottom)box.scrollTop=box.scrollHeight;
+}
+
+function scenarioLabel(scenario) {
+ const entry=catalog.find(e=>e.data.id===scenario.id);
+ const base=entry?entry.path.split('/').pop().replace(/\.json$/,''):(scenario.id||'Scenario').replace(/_\d+$/,'');
+ return base.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
+}
+function showInfo(title,content) {
+ $('info-title').textContent=title;$('info-content').replaceChildren(content);$('info-dialog').showModal();
+}
+function showScenarioDetails(scenario) {
+ if(!scenario)return;
+ const content=document.createElement('div');
+ const add=(heading,text)=>{if(!text)return;const h=document.createElement('h3'),p=document.createElement('p');h.textContent=heading;p.textContent=text;content.append(h,p);};
+ add('Full description',scenario.title);add('Context',scenario.context);add('Topic',scenario.topic);
+ for(const k of [1,2]){const option=scenario[`strategy_${k}`];if(option)add(`Strategy ${k} · ${option.name}`,option.candidate);}
+ showInfo(scenarioLabel(scenario),content);
+}
+$('title').onclick=()=>{
+ const task=selectedTask||events[lastIndex]?.task;
+ const scenario=task?activeConfig?.scenarios?.[Number(task.split('_')[1])]:catalog.find(e=>e.path===$('scenarios').value)?.data;
+ showScenarioDetails(scenario);
+};
+$('selected-scenario-info').onclick=()=>showScenarioDetails(catalog.find(e=>e.path===$('scenarios').value)?.data);
+$('info-close').onclick=()=>$('info-dialog').close();
+$('info-dialog').addEventListener('click',event=>{if(event.target===$('info-dialog')){const r=$('info-dialog').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('info-dialog').close();}});
+// Keep the existing dynamic help sources intact while presenting compact links.
+for(const source of document.querySelectorAll('#setup p:not(#error)')) {
+ const button=document.createElement('button');button.type='button';button.className='control-help';
+ const titles={'persona-help':'Persona','model-help':'Model selection','stopping-help':'Stopping policy','decision-help':'Choice procedure','sampling-help':'Sampling'};
+ const preceding=source.previousElementSibling;
+ const caption=titles[source.id]||(preceding?.matches('label')?preceding.childNodes[0]?.textContent.trim():'Options');
+ button.textContent=`ⓘ ${caption||'Options'} help`;button.setAttribute('aria-haspopup','dialog');
+ source.classList.add('help-source');source.after(button);
+ button.onclick=()=>{const body=document.createElement('div');for(const child of source.childNodes)body.append(child.cloneNode(true));showInfo(caption||'Options',body);};
+ const sync=()=>{button.hidden=source.hidden||!source.textContent.trim();};sync();
+ new MutationObserver(sync).observe(source,{attributes:true,attributeFilter:['hidden'],childList:true,subtree:true,characterData:true});
 }
