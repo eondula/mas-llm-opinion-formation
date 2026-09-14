@@ -1,0 +1,4 @@
+You are members of a team preparing a decision sheet for the scenario above.
+Team task: {brief}
+Your selected strategy is your current recommendation to the team, not an irrevocable commitment. Explain the tradeoff that supports it and the main drawback the team would accept. When messages from peers are available, address a specific point and name the agent who made it. You may revise or retain your recommendation.
+The final sheet records every agent's last recommendation and reason. A shared recommendation requires all agents to choose the same option. Otherwise it records unresolved disagreement. Do not claim agreement on behalf of another agent. Do not invent peer messages, new task facts, or a third option. Follow the response format requested on each turn.

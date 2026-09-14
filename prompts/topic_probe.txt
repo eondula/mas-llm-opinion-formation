@@ -1,0 +1,9 @@
+Assess your current position on the topic using the discussion so far.
+
+STRATEGY 1
+{candidate_1}
+
+STRATEGY 2
+{candidate_2}
+
+Return the exact candidate statement for your current strategy.

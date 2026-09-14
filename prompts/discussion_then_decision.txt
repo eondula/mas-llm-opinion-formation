@@ -1,0 +1,4 @@
+{turn_instruction}
+Discuss the tradeoff before selecting your next strategy. When peer messages are available, address at least one specific point and name the agent who made it. Explain what you accept, challenge, or remain uncertain about and why. Relate your response to the scenario and your assigned priorities, if any.
+You may develop your own reasoning or use the supplied arguments. Keep the task facts fixed. Identify hypothetical assumptions explicitly. You may retain or reconsider your earlier position; neither agreement nor a change of strategy is required.
+Return only your discussion response. A separate decision step follows this response. Do not output a strategy label or JSON here.

@@ -1,0 +1,3 @@
+{instruction}
+Decide whether to continue discussing or finish. Finishing may preserve disagreement; it does not require changing your strategy. Continue if you have an unresolved point worth discussing. Do not speak for other agents.
+Return only a JSON object with "conversation_action" ("continue" or "finish") and "reason" (a short nonempty explanation).

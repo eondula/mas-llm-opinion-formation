@@ -1,0 +1,3 @@
+{candidate}
+{turn_instruction}
+Develop your own arguments about the topic and the two strategies. No supporting argument list is supplied. Explain the considerations behind your assessment, ask a focused question, or explore a consequence. When peer messages are available, address a specific point and name the agent who made it. You may retain or revise your assessment; do not manufacture disagreement. Distinguish general reasoning and hypothetical assumptions from established facts. Do not invent evidence, numerical claims, or statements by peers. Return only your conversational response, without repeating the endorsement or adding a speaker label.
