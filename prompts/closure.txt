@@ -1,3 +1,6 @@
 {instruction}
-Decide whether to continue discussing or finish. Finishing may preserve disagreement; it does not require changing your strategy. Continue if you have an unresolved point worth discussing. Do not speak for other agents.
+Decide whether another exchange would help complete the team recommendation.
+Choose continue when you can identify a specific unanswered question or objection that another agent could address using the available information. State that question or objection and explain how its answer could affect your recommendation.
+The existence of competing benefits and costs does not by itself require further discussion. You may finish while acknowledging drawbacks, uncertainty, or disagreement. Finishing does not require changing your strategy.
+Choose finish when you have no further actionable point to raise. Do not assume new evidence or additional options will become available. Do not speak for other agents.
 Return only a JSON object with "conversation_action" ("continue" or "finish") and "reason" (a short nonempty explanation).
