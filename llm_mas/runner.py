@@ -90,7 +90,11 @@ def execute(raw, name=None, resume=False):
                     triggers = [r['round'] for r in rows if (r.get('termination') or {}).get('reason') == 'system_detected_stability']
                     termination = dict(reason='fixed_horizon', round=rows[-1]['round'], first_proposed_stop=min(triggers) if triggers else None)
                 termination_status = termination or {}
-                write(target, dict(config=active, scenario=scenario, rows=rows, termination=termination))
+                record = dict(config=active, scenario=scenario, rows=rows, termination=termination)
+                if active['mode'] == 'joint_task':
+                    record['joint_outcome'] = rows[-1]['joint_outcome']
+                    write(path/'joint_decision.json', dict(task=target.stem, brief=active['joint_task_brief'], **record['joint_outcome']))
+                write(target, record)
         if config.get('research'):
             from .research import run as run_research
             for model_name in {m for task in tasks for m in task['models']}:

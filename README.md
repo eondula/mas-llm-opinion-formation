@@ -52,7 +52,11 @@ python -m llm_mas dashboard
 
 Open **http://127.0.0.1:8766**. Select the models, scenario and conversation settings, then start a run. Use **Quick preview** for a single conversation and **Study** for a sweep. Select CUDA for GPU execution. Saved runs and figures are accessible from the dashboard.
 
+For interactive testing, select **Discussion prompt → Discussion then decision**. After initialization, each agent discusses the available messages before reassessing its choice. Existing controls still apply. Scored choice uses endorsement scores after discussion; generated choice adds a separate JSON decision call. The dedicated prompt is `prompts/discussion_then_decision.txt`. Saved response records include the discussion generation, pre-discussion scores, decision scores and post-response scores. Original, Open discussion and Topic discussion remain available.
+
 Use the terminal presets below to run the exact full behavioral, fixed and reversed study grids.
+
+Select **Run mode → Joint decision task** to give agents a shared recommendation task. Edit the team brief and choose fixed or adaptive stopping; other controls remain available. The decision sheet shows each agent's choice and reason, plus shared choice or unresolved disagreement. It does not force consensus or add a vote. The task prompt is `prompts/joint_task.txt`; the final sheet is saved as `joint_decision.json` in the run folder.
 
 ## Run from the terminal
 
@@ -106,3 +110,5 @@ Resume an interrupted run with unchanged code and configuration, or regenerate i
 python -m llm_mas resume --run-id full_behavioral_new
 python -m llm_mas figures --run-id full_behavioral_new
 ```
+
+For **Joint decision task**, select **Agent-negotiated closure** to stop through explicit proposal and unanimous confirmation. Closure uses separate greedy control calls and no similarity threshold. All agents review the same completed round; a veto or invalid signal continues discussion. Closure may preserve disagreement. The dashboard shows control reasons, and raw controls are saved in termination records. No peer disables this extra exchange. The maximum rounds remain a budget safeguard. Edit `prompts/closure.txt` to change the control instruction.

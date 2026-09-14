@@ -7,6 +7,7 @@ def main():
     p=argparse.ArgumentParser(description='Opinion formation study runner')
     sub=p.add_subparsers(dest='command',required=True)
     preview=sub.add_parser('preview')
+    preview.add_argument('--prompt-style',choices=['original','open_discussion','topic_discussion','discussion_then_decision'],default='original')
     preview.add_argument('--model',default=DEFAULT_MODEL)
     preview.add_argument('--agents',type=int,default=2)
     preview.add_argument('--models',nargs='+',help='One checkpoint per agent; overrides --model')
@@ -67,7 +68,7 @@ def main():
     if args.command=='resume': raw=json.loads((run_path(args.run_id)/'config.json').read_text())
     elif args.command=='study':raw=json.loads(Path(args.config).read_text());raw.setdefault('mode','study')
     else:
-        raw=dict(models=args.models or [args.model],agents=args.agents,agent_configuration=args.agent_configuration,scenarios=[args.scenario],rounds=args.rounds,argument_mode=args.argument_mode,
+        raw=dict(prompt_style=args.prompt_style,models=args.models or [args.model],agents=args.agents,agent_configuration=args.agent_configuration,scenarios=[args.scenario],rounds=args.rounds,argument_mode=args.argument_mode,
                  initialization='natural' if args.initialization=='natural' else [int(x) for x in args.initialization.split(',')],
                  schedule=args.schedule,device=args.device,sentiment=not args.no_sentiment)
     if args.command == 'study' and args.device is not None:

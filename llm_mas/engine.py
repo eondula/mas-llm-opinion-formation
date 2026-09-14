@@ -9,7 +9,7 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
     n = config['agents']
     names = [f'Agent {chr(65+i)}' if i < 26 else f'Agent {i+1}' for i in range(n)]
     models = config['models'] * n if len(config['models']) == 1 else config['models']
-    histories = [initial(scenario, texts, config['presentation_order'], n, persona=i%2+1 if config.get('persona') else None) for i, _ in enumerate(names)]
+    histories = [initial(scenario, texts, config['presentation_order'], n, persona=i%2+1 if config.get('persona') else None, prompt_style=config.get('prompt_style','original'), agent_name=names[i] if config.get('prompt_style','original') != 'original' or config['mode'] == 'joint_task' else None, joint_task_brief=config.get('joint_task_brief') if config['mode'] == 'joint_task' else None) for i, _ in enumerate(names)]
     counts = [{1:0,2:0} for _ in names]
     messages, rows = [None]*n, []
     similarity = None
@@ -28,6 +28,25 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
                     if j != i:
                         deliveries.append(dict(speaker=names[j], receiver=names[i], message=incoming[j], round=t))
                         histories[i].append({'role':'user','content':texts['peer_message'].format(speaker=names[j], message=incoming[j])})
+            generation_options = {}
+            if config.get('decoding') == 'fixed_sampling':
+                sampling = dict(config['sampling'])
+                sampling['seed'] += t*n+i
+                generation_options['sampling'] = sampling
+            discussion_generation = None
+            pre_discussion = None
+            discuss_first = config.get('prompt_style') == 'discussion_then_decision' and t > 0
+            if discuss_first:
+                runtime.interaction_context['stage'] = 'pre_discussion'
+                pre_discussion = runtime.measure(histories[i], scenario, texts)
+                prompt = discussion_prompt(config, texts, scenario, deliveries, '')
+                runtime.interaction_context['stage'] = 'discussion'
+                discussion_generation = dict(runtime.generate(
+                    histories[i]+[{'role':'user','content':prompt}],
+                    config['max_argument_tokens'], **generation_options), instruction=prompt)
+                # Temporary response is used for reassessment, then consolidated into
+                # the single public message retained and delivered to peers.
+                histories[i].append({'role':'assistant','content':discussion_generation['output']})
             forced = t == 0 and config['initialization'] != 'natural'
             if forced:
                 strategy = config['initialization'][i]
@@ -41,11 +60,6 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
             decision_history = deepcopy(histories[i])
             selected = scenario[f'strategy_{strategy}']
             choice_status = 'forced' if forced else 'scored'
-            generation_options = {}
-            if config.get('decoding') == 'fixed_sampling':
-                sampling = dict(config['sampling'])
-                sampling['seed'] += t*n+i
-                generation_options['sampling'] = sampling
             runtime.interaction_context['stage'] = 'response'
             generation = None
             argument_selection = None
@@ -54,10 +68,16 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
             if autonomous:
                 from .choice_output import parse, instruction, recovery, PARSER_VERSION
                 prompt = instruction(texts, scenario)
+                if discuss_first:
+                    prompt += '\nReassess after your discussion above. You may retain or revise your strategy. Give a brief reason for your decision.'
+                elif config.get('prompt_style', 'original') != 'original':
+                    prompt = discussion_prompt(config, texts, scenario, deliveries, 'Choose your current strategy') + '\nReturn only a JSON object with strategy (integer 1 or 2) and explanation (your conversational response).'
                 generation = runtime.generate(histories[i]+[{'role':'user','content':prompt}], config['max_argument_tokens'], **generation_options)
                 generation = dict(generation, instruction=prompt)
                 strategy, argument, choice_status = parse(generation['output'])
                 generation.update(choice_parser_version=PARSER_VERSION, choice_recovery=recovery(generation['output']))
+            elif discuss_first:
+                argument = discussion_generation['output']
             elif config['argument_mode'] in ('generated', 'conversational'):
                 prompt = texts['generate_argument'].format(candidate=selected['candidate'])
                 if config['argument_mode'] == 'conversational':
@@ -71,6 +91,8 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
                 argument = generation['output']
             elif config['argument_mode'] == 'combined_reasoning':
                 prompt = texts['stance_probe'].format(candidate_1=scenario['strategy_1']['candidate'], candidate_2=scenario['strategy_2']['candidate'])
+                if config.get('prompt_style', 'original') != 'original':
+                    prompt = discussion_prompt(config, texts, scenario, deliveries, selected['candidate'])
                 prefix = selected['candidate'] + '\n'
                 generation = runtime.generate(histories[i] + [{'role':'user','content':prompt}], config['max_argument_tokens'], continuation_prefix=prefix, **generation_options)
                 generation = dict(generation, instruction=prompt, continuation_prefix=prefix, argument_mode='combined_reasoning')
@@ -88,6 +110,13 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
                 argument = selected['arguments'][argument_index]
                 counts[i][strategy] += 1
             message = generation['output'] if autonomous else selected['candidate']+'\n'+argument
+            if discuss_first:
+                histories[i].pop()  # Remove temporary discussion; retain it once below.
+                if autonomous:
+                    argument = discussion_generation['output']+'\n\nReassessment: '+argument
+                    message = discussion_generation['output']+'\n\nReassessment:\n'+generation['output']
+                else:
+                    message = argument+'\n\nDecision: '+selected['candidate']
             messages[i] = message
             histories[i].append({'role':'assistant','content':message})
             runtime.interaction_context['stage'] = 'post'
@@ -95,8 +124,23 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
             row = dict(round=t, agent=names[i], model=models[i], strategy=strategy, forced=forced,
                        before=before, decision=decision, post=post, message=message, argument=argument, choice_status=choice_status,
                        generation=generation, argument_index=argument_index, argument_selection=argument_selection, deliveries=deliveries, decision_history=decision_history, history=deepcopy(histories[i]))
+            if config.get('prompt_style') == 'discussion_then_decision':
+                row.update(prompt_style='discussion_then_decision',
+                           decision_timing='after_discussion' if discuss_first else 'initialization',
+                           pre_discussion=pre_discussion, discussion_generation=discussion_generation)
             rows.append(row)
             emit(kind='response', row=row, completed=len(rows), total=(config['rounds']+1)*n)
+        if config.get('stopping') == 'agent_closure' and t >= 1:
+            from .closure import check
+            termination = check(config, texts, runtimes, models, names, histories, rows[-n:], t)
+            for i, name in enumerate(names):
+                row = next(r for r in rows[-n:] if r['agent'] == name)
+                row['termination'] = termination
+                row['history_after_closure'] = deepcopy(histories[i])
+            emit(kind='termination_check', **termination,
+                 completed=len(rows), total=(config['rounds']+1)*n)
+            if termination['reason']:
+                break
         if config.get('stopping') in ('exact_repetition', 'cosine_similarity', 'combined_stability', 'sign_stability') and t >= 1:
             details = {}
             if config['stopping'] == 'cosine_similarity' and t < config.get('minimum_rounds', 2):
@@ -138,4 +182,26 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
                  completed=len(rows), total=(config['rounds']+1)*n)
             if reason and not config.get('observe_stopping', False):
                 break
+    if config['mode'] == 'joint_task':
+        from .joint_task import decision_sheet
+        rows[-1]['joint_outcome'] = decision_sheet(rows, scenario, n, config['schedule'])
     return rows
+
+
+def discussion_prompt(config, texts, scenario, deliveries, candidate):
+    turn = ('Respond to the peer messages delivered above.' if deliveries else
+            'This is initialization: no peer has spoken. Give your initial assessment or identify a question for later discussion; do not imply a peer has made a claim.')
+    pools = '\n\n'.join('STRATEGY '+str(k)+'\n'+scenario[f'strategy_{k}']['candidate']+'\n'+'\n'.join(scenario[f'strategy_{k}']['arguments']) for k in (1,2))
+    if config['prompt_style'] == 'topic_discussion':
+        keys = (2,1) if config.get('reverse_candidate_blocks') else (1,2)
+        pools = '\n\n'.join('STRATEGY '+str(k)+'\n'+scenario[f'strategy_{k}']['candidate'] for k in keys)
+    style = config['prompt_style']
+    if style == 'discussion_then_decision':
+        if candidate:  # Initialization keeps the established choice-first behavior.
+            style = 'open_discussion'
+        else:
+            turn = ('Respond to the peer messages delivered above.' if deliveries else
+                    'No peer message has been delivered. Reconsider your own earlier reasoning; do not invent peer statements.')
+        if config.get('reverse_candidate_blocks'):
+            pools = '\n\n'.join('STRATEGY '+str(k)+'\n'+scenario[f'strategy_{k}']['candidate']+'\n'+'\n'.join(scenario[f'strategy_{k}']['arguments']) for k in (2,1))
+    return pools+'\n\n'+texts[style].format(candidate=candidate,turn_instruction=turn)

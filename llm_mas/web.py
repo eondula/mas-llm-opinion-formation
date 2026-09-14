@@ -97,11 +97,16 @@ def serve(port=8766):
                     name=parse_qs(parsed.query).get('run_id',[state['run_id'] or next(iter(discovered),None)])[0];p=run_path(name) if name else None
                     status=json.loads((p/'status.json').read_text()) if p and (p/'status.json').exists() else {'phase':'idle'}
                     events=[]
+                    closure_events=[]
                     if p and (p/'events.jsonl').exists():
                         for line in (p/'events.jsonl').read_text().splitlines():
                             try:
                                 event = json.loads(line)
                                 if "row" in event: events.append(display_event(event))
+                                if event.get('kind') == 'termination_check' and event.get('policy') == 'agent_closure':
+                                    closure_events.append({k:event.get(k) for k in ('task','round','reason','proposal','unavailable')} | {
+                                        phase:[{k:v.get(k) for k in ('agent','action','reason','valid')} for v in event.get(phase,[])]
+                                        for phase in ('proposals','confirmations')})
                             except json.JSONDecodeError:pass
                     proc=state['process'] if name==state['run_id'] else None
                     if p and (p/'conversations').exists():
@@ -127,7 +132,7 @@ def serve(port=8766):
                                 status['log_tail']=log.read().decode('utf-8',errors='replace')
                     config=json.loads((p/'config.json').read_text()) if p and (p/'config.json').exists() else None
                     tasks=json.loads((p/'tasks.json').read_text()) if p and (p/'tasks.json').exists() else []
-                    return self.send(dict(run_id=name,status=status,events=events,config=config,tasks=tasks,running=(proc is not None and proc.poll() is None) or name in discovered,can_stop=proc is not None and proc.poll() is None))
+                    return self.send(dict(run_id=name,status=status,events=events,closure_events=closure_events,config=config,tasks=tasks,running=(proc is not None and proc.poll() is None) or name in discovered,can_stop=proc is not None and proc.poll() is None))
                 assets={'/site.css':('dashboard/site.css','text/css'),'/site.js':('dashboard/site.js','text/javascript'),'/analyze.html':('dashboard/analyze.html','text/html'),'/analyze.js':('dashboard/analyze.js','text/javascript'),'/analyze.css':('dashboard/analyze.css','text/css'),'/':('dashboard/study.html','text/html'),'/study.js':('dashboard/study.js','text/javascript'),'/styles.css':('dashboard/styles.css','text/css'),'/study.css':('dashboard/study.css','text/css'),'/docs.html':('dashboard/docs.html','text/html')}
                 if self.path in assets:
                     filename,mime=assets[self.path];return self.send((ROOT/filename).read_bytes(),mime)
@@ -151,7 +156,7 @@ def serve(port=8766):
                 if self.path=='/api/preview':
                     from .prompts import templates,initial
                     config=resolve(data)
-                    return self.send(dict(config=config,prompts=[initial(s,templates(),config['presentation_order'],config['agents'],persona=i%2+1 if config.get('persona') else None) for s in config['scenarios'] for i in range(config['agents'] if config.get('persona') else 1)]))
+                    return self.send(dict(config=config,prompts=[initial(s,templates(),config['presentation_order'],config['agents'],persona=i%2+1 if config.get('persona') else None, prompt_style=config.get('prompt_style','original'), joint_task_brief=config.get('joint_task_brief') if config['mode']=='joint_task' else None, agent_name=(f'Agent {chr(65+i)}' if i<26 else f'Agent {i+1}') if config.get('prompt_style','original')!='original' or config['mode']=='joint_task' else None) for s in config['scenarios'] for i in range(config['agents'] if config.get('persona') or config.get('prompt_style','original')!='original' or config['mode']=='joint_task' else 1)]))
                 with lock:
                     proc=state['process']
                     if self.path=='/api/stop':

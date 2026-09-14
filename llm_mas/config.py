@@ -25,6 +25,8 @@ def validate_scenario(data):
         if not isinstance(data.get(field), str) or not data[field].strip():
             raise ValueError(f'Missing scenario {field}')
     if not re.fullmatch(r'[A-Za-z0-9_-]+',data['id']):raise ValueError('Scenario ID may contain only letters, numbers, underscores and hyphens')
+    if 'context' in data and (not isinstance(data['context'], str) or not data['context'].strip()):
+        raise ValueError('Scenario context must be nonempty text')
     for key in ('strategy_1', 'strategy_2'):
         s = data.get(key, {})
         if not isinstance(s,dict):raise ValueError(f'{key} must be an object')
@@ -59,6 +61,16 @@ def resolve(raw):
              initialization='natural', schedule='synchronous', argument_mode='predefined',
              max_argument_tokens=128, sentiment=True, device='auto', presentation_order='strategy_1_first')
     c.update(raw)
+    if c['mode'] == 'joint_task':
+        from .joint_task import DEFAULT_BRIEF
+        c.setdefault('joint_task_brief', DEFAULT_BRIEF)
+        if not isinstance(c['joint_task_brief'], str) or not c['joint_task_brief'].strip() or len(c['joint_task_brief']) > 3000:
+            raise ValueError('Joint task brief must contain 1–3000 characters')
+    c.setdefault('prompt_style', 'original')
+    if c['prompt_style'] not in ('original', 'open_discussion', 'topic_discussion', 'discussion_then_decision'):
+        raise ValueError('Invalid prompt style')
+    if c['prompt_style'] != 'original' and c['argument_mode'] != 'combined_reasoning':
+        raise ValueError('Discussion prompt presets require combined_reasoning')
     c['decoding'] = c.get('decoding', 'greedy')
     if c['decoding'] not in ('greedy', 'fixed_sampling'):
         raise ValueError('Unknown decoding mode')
@@ -100,10 +112,12 @@ def resolve(raw):
             candidate=ROOT/'scenarios/study'/f'{name}.json'
             enriched.append(str(candidate) if name in ('sensor','storage') and candidate.exists() else value)
         c['scenarios']=enriched
-    if c.get('stopping', 'fixed') not in ('fixed', 'exact_repetition', 'cosine_similarity', 'combined_stability', 'sign_stability'):
+    if c.get('stopping', 'fixed') not in ('fixed', 'exact_repetition', 'cosine_similarity', 'combined_stability', 'sign_stability', 'agent_closure'):
         raise ValueError('Invalid stopping policy')
     if c.get('stopping') in ('exact_repetition', 'cosine_similarity', 'combined_stability', 'sign_stability') and c.get('export_profile') in ('experiment_c', 'experiment_d'):
         raise ValueError('Adaptive stopping requires the generic figure exporter')
+    if c.get('stopping') == 'agent_closure' and (c.get('observe_stopping') or c.get('export_profile')):
+        raise ValueError('Agent closure requires normal stopping and the generic exporter')
     if c.get('stopping') == 'sign_stability':
         c.pop('minimum_rounds', None)
         c.pop('margin_tolerance', None)
@@ -129,10 +143,10 @@ def resolve(raw):
         threshold = c['similarity_threshold']
         if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not math.isfinite(threshold) or not -1 <= threshold <= 1:
             raise ValueError('Similarity threshold must be between -1 and 1')
-    if c['mode'] not in ('preview', 'study'): raise ValueError('Invalid mode')
+    if c['mode'] not in ('preview', 'study', 'joint_task'): raise ValueError('Invalid mode')
     if not isinstance(c['agents'], int) or c['agents'] < 2: raise ValueError('At least two agents required')
     if not isinstance(c['rounds'], int) or c['rounds'] < 1: raise ValueError('Rounds must be positive')
-    if c['mode'] == 'preview' and len(c['scenarios']) != 1:
+    if c['mode'] in ('preview', 'joint_task') and len(c['scenarios']) != 1:
         raise ValueError('Preview requires one scenario')
     if len(c['models']) not in (1, c['agents']) or not all(isinstance(m, str) and m.strip() for m in c['models']):
         raise ValueError('Supply one model or one checkpoint per agent')
@@ -140,7 +154,7 @@ def resolve(raw):
         raise ValueError('Homogeneous mode requires a shared checkpoint')
     if c.get('agent_configuration') == 'heterogeneous' and len(c['models']) != c['agents']:
         raise ValueError('Per-agent mode requires one checkpoint selection per agent; repeated checkpoints are allowed')
-    if c['mode']=='preview' and any(c.get(k) for k in ('grid','agent_counts','model_configurations')):
+    if c['mode'] in ('preview', 'joint_task') and any(c.get(k) for k in ('grid','agent_counts','model_configurations')):
         raise ValueError('Preview runs one conversation; sweeps require study mode')
     if c['schedule'] not in ('synchronous', 'sequential', 'reverse_sequential', 'no_peer'): raise ValueError('Invalid schedule')
     if c['argument_mode'] not in ('predefined', 'agent_selected', 'generated', 'conversational', 'combined_fixed', 'combined_reasoning'): raise ValueError('Invalid argument mode')
@@ -160,9 +174,9 @@ def resolve(raw):
     for record in records: validate_scenario(record)
     if not records or len({x['id'] for x in records}) != len(records): raise ValueError('Scenarios must be nonempty and have unique IDs')
     if set(c.get('research', [])) - {'validation', 'history', 'replay', 'prediction', 'mechanistic', 'heads', 'source_spans', 'continuation', 'sufficiency'}: raise ValueError('Unknown research module')
-    if c['mode'] == 'preview' and (c.get('conditions') or c.get('research')): raise ValueError('Preview runs one conversation; conditions and research require study mode')
+    if c['mode'] in ('preview', 'joint_task') and (c.get('conditions') or c.get('research')): raise ValueError('Preview runs one conversation; conditions and research require study mode')
     for condition in c.get('conditions', []):
-        if set(condition) - {'initialization','schedule','argument_mode','presentation_order','persona','decision_mode','stopping','observe_stopping'}: raise ValueError('Invalid condition fields')
+        if set(condition) - {'initialization','schedule','argument_mode','presentation_order','persona','decision_mode','stopping','observe_stopping','prompt_style'}: raise ValueError('Invalid condition fields')
         resolve(dict(c, **condition, conditions=[]))
     if not isinstance(c.get('persona', False), bool):
         raise ValueError('Persona must be true or false')
