@@ -2,11 +2,11 @@
 
 A research team must choose between two strategies.
 
-Option A:
+{a_label}:
 - {a1}
 - {a2}
 
-Option B:
+{b_label}:
 - {b1}
 - {b2}
 

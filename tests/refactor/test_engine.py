@@ -17,8 +17,8 @@ class EngineTests(unittest.TestCase):
         expected = (
             "Storage volume versus data fidelity.\n\n"
             "A research team must choose between two strategies.\n\n"
-            "Option A:\n- more storage space is required\n- stored data has higher fidelity\n\n"
-            "Option B:\n- less storage space is required\n- stored data has lower fidelity\n\n"
+            "Strategy 1:\n- more storage space is required\n- stored data has higher fidelity\n\n"
+            "Strategy 2:\n- less storage space is required\n- stored data has lower fidelity\n\n"
             "No other information should be considered."
         )
         self.assertEqual(initial(s,templates())[1]['content'],expected)

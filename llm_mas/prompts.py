@@ -6,7 +6,10 @@ def templates():
 
 def initial(scenario, texts, order='strategy_1_first', agents=2, persona=None, agent_name=None, prompt_style="original", joint_task_brief=None):
     a, b = scenario['strategy_1'], scenario['strategy_2']
-    if order == 'strategy_2_first': a, b = b, a
+    a_label, b_label = 'Strategy 1', 'Strategy 2'
+    if order == 'strategy_2_first':
+        a, b = b, a
+        a_label, b_label = b_label, a_label
     system = texts['topic_system'] if prompt_style == 'topic_discussion' else texts['system']
     scenario_template = texts['scenario']
     if prompt_style in ('open_discussion', 'discussion_then_decision'):
@@ -24,13 +27,13 @@ def initial(scenario, texts, order='strategy_1_first', agents=2, persona=None, a
         system = system.replace('another artificial agent', 'other artificial agents')
     if prompt_style == 'topic_discussion':
         topic = scenario.get('topic', scenario['title'])
-        content = 'Topic: '+topic+'\n\nOption A: '+a['candidate']+'\nOption B: '+b['candidate']
+        content = 'Topic: '+topic+'\n\n'+a_label+': '+a['candidate']+'\n'+b_label+': '+b['candidate']
         return [{'role':'system','content':system}, {'role':'user','content':content}]
     if scenario.get('context'):
         # Escape braces because the scenario template is formatted below.
         scenario_template = scenario['context'].replace('{', '{{').replace('}', '}}') + '\n\n' + scenario_template
     return [{'role':'system', 'content':system}, {'role':'user', 'content':scenario_template.format(
-        title=scenario['title'], a1=a['property_1'], a2=a['property_2'], b1=b['property_1'], b2=b['property_2'])}]
+        title=scenario['title'], a_label=a_label, b_label=b_label, a1=a['property_1'], a2=a['property_2'], b1=b['property_1'], b2=b['property_2'])}]
 
 
 def for_condition(texts, config, scenario):

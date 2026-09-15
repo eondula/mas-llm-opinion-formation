@@ -11,7 +11,8 @@ class ContextTests(unittest.TestCase):
                     messages=initial(s,templates(),order,prompt_style=style)
                     self.assertIn(s['context'],messages[1]['content'])
                     first=s['strategy_1' if order=='strategy_1_first' else 'strategy_2']['property_1']
-                    self.assertIn('Option A:\n- '+first,messages[1]['content'])
+                    label = 'Strategy 2' if order == 'strategy_2_first' else 'Strategy 1'
+                    self.assertIn(label+':\n- '+first,messages[1]['content'])
             plain=dict(s);plain.pop('context')
             self.assertEqual(initial(s,templates())[1]['content'],s['context']+'\n\n'+initial(plain,templates())[1]['content'])
             s['context']=123

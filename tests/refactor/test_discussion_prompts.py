@@ -32,8 +32,8 @@ class DiscussionTests(unittest.TestCase):
         for row,(messages,_,_) in zip(rows,f.generated):
             joined=str(messages)
             self.assertIn(s['topic'],joined)
-            self.assertIn('Option A:',joined)
-            self.assertIn('Option B:',joined)
+            self.assertIn('Strategy 1:',joined)
+            self.assertIn('Strategy 2:',joined)
             self.assertNotIn(s['context'],joined)
             for k in (1,2):
                 self.assertIn(s[f'strategy_{k}']['candidate'],joined)
