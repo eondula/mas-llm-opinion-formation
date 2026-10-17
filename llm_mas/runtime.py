@@ -25,7 +25,7 @@ class Runtime:
         self.tokenizer = AutoTokenizer.from_pretrained(name, **({'revision':tokenizer_revision or revision} if tokenizer_revision or revision else {}))
         self.tokenizer_revision=tokenizer_revision or revision
         print(f'Loading {name}: model weights', flush=True)
-        self.model = AutoModelForCausalLM.from_pretrained(name, torch_dtype='auto', **({'revision':revision} if revision else {})).eval()
+        self.model = AutoModelForCausalLM.from_pretrained(name, torch_dtype=getattr(torch,expected_dtype.removeprefix('torch.')) if expected_dtype else 'auto', **({'revision':revision} if revision else {})).eval()
         self.revision=revision
         if revision and getattr(self.model.config,'_commit_hash',None)!=revision:
             raise ValueError('Loaded model revision does not match pinned revision')

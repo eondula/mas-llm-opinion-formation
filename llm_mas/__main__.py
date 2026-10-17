@@ -6,7 +6,8 @@ from .config import ROOT, DEFAULT_MODEL, resolve, scenario, run_path, validate_s
 def main():
     p=argparse.ArgumentParser(description='Opinion formation study runner')
     sub=p.add_subparsers(dest='command',required=True)
-    sub.add_parser('pilot-freeze',help='Freeze the reviewed pilot protocol')
+    pilot_freeze=sub.add_parser('pilot-freeze',help='Freeze the reviewed pilot on this machine')
+    pilot_freeze.add_argument('--device',choices=['mps','cuda'],default='mps')
     dataset=sub.add_parser('dataset', help='Prepare or inspect StrategyQA data')
     dataset.add_argument('action', choices=['download','info'])
     preview=sub.add_parser('preview')
@@ -47,7 +48,7 @@ def main():
     args=p.parse_args()
     if args.command=='pilot-freeze':
         from .pilot import freeze
-        print(json.dumps(freeze(),indent=2));return
+        print(json.dumps(freeze(device=args.device),indent=2));return
     if args.command=='dataset':
         from .datasets import download, describe
         info=download(ROOT) if args.action=='download' else describe(ROOT)
@@ -105,7 +106,7 @@ def main():
         raw=json.loads(input_path(args.config).read_text())
         if raw.get('pilot_protocol'):
             from .pilot import preset
-            raw=dict(preset(),**raw)
+            raw=dict(preset(protocol=raw['pilot_protocol']),**raw)
         raw.setdefault('mode', 'experiment' if args.command == 'run' else 'study')
     else:
         raw=dict(prompt_style=args.prompt_style,models=args.models or [args.model],agents=args.agents,agent_configuration=args.agent_configuration,scenarios=[args.scenario],rounds=args.rounds,argument_mode=args.argument_mode,

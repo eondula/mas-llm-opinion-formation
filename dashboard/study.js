@@ -96,9 +96,8 @@ function draw(index){
  names.splice(0,names.length,...Array.from({length:n},(_,i)=>i<26?`Agent ${String.fromCharCode(65+i)}`:`Agent ${i+1}`));
  const visible=responseFrame(events,index,current,settings||{agents:n,schedule:$('schedule').value});
  const arena=$('arena');arena.querySelectorAll('.agent').forEach(e=>e.remove());arena.classList.toggle('many-agents',n>2);arena.classList.toggle('single-agent',n===1);arena.style.setProperty('--agent-scale',Number($('size').value)/100);
- if(n>2)arena.style.minHeight=Math.max(850,n*110)+'px';else arena.style.minHeight='';
+ arena.style.minHeight='';
  names.forEach((name,i)=>{const row=seen[name],node=agentTemplate.cloneNode(true);node.id='study-agent-'+i;node.style.setProperty('--agent-color',agentColor(i));node.style.setProperty('--motion-delay',`${-i*.7}s`);node.className='agent '+(i%2?'right':'left');
- if(n>2){const angle=2*Math.PI*i/n-Math.PI/2;node.style.left=(50+33*Math.cos(angle))+'%';node.style.top=(50+34*Math.sin(angle))+'%';}
  node.querySelector('.speaker').textContent=name;node.querySelector('.name').textContent=name;node.querySelector('.message').textContent=row?.message||'';
  const active=visible.find(r=>r.agent===name);
  const shown=active;
@@ -202,6 +201,7 @@ function chart(container, trajectories, caption) {
   const ns='http://www.w3.org/2000/svg', W=520,H=235,l=42,r=15,t=20,b=32;
   const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('role','img');svg.setAttribute('aria-label',caption);
   const make=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;svg.append(el);return el;};
+  make('desc',{id:container+'-description'},names.map(name=>name+': '+(trajectories[name]||[]).map((v,i)=>'round '+i+' '+fmt(v)).join('; ')).join('. '));svg.setAttribute('aria-describedby',container+'-description');
   const n=Math.max(...names.map(k=>trajectories[k]?.length||0));const x=i=>l+i/Math.max(n-1,1)*(W-l-r),y=v=>t+(1-v)/2*(H-t-b);
   for(const v of [-1,0,1]){make('line',{x1:l,y1:y(v),x2:W-r,y2:y(v),stroke:'var(--edge)'});make('text',{x:l-9,y:y(v)+4,'text-anchor':'end','font-size':11,fill:'var(--muted)'},v);}
   const step=Math.max(1,Math.ceil((n-1)/8));for(let i=0;i<n;i++)if(i%step===0||i===n-1)make('text',{x:x(i),y:H-12,'text-anchor':'middle','font-size':11,fill:'var(--muted)'},i);

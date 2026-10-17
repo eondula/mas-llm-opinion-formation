@@ -29,3 +29,14 @@
 .experiment-page .sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @media(max-width:1000px){.experiment-layout{grid-template-columns:270px minmax(0,1fr)}}
 @media(max-width:700px){.experiment-layout{grid-template-columns:1fr}.experiment-page .experiment-main>section:not(.context){padding:18px}}
+/* Progress and summaries are independent boxes; wide tables scroll locally. */
+.experiment-page .run-progress{display:block}
+.experiment-page .saved label{min-width:0;flex:1 1 16rem}
+.experiment-page .table-wrap{max-width:100%;overflow:auto;overscroll-behavior-inline:contain}
+.experiment-page table{width:100%}
+.experiment-page .setup-grid label{font-size:.875rem}
+.experiment-page .hint{font-size:.875rem}
+.experiment-page progress{height:.75rem}
+.experiment-page .experiment-main>section:not(.context){padding:clamp(1rem,2vw,1.5rem)}
+.experiment-page #pilot-help{white-space:pre-wrap}
+@media(max-width:60rem){.experiment-layout{grid-template-columns:minmax(0,1fr)}.experiment-page .setup-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr))}}

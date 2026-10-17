@@ -83,10 +83,16 @@ def serve(port=8766):
             try:
                 parsed=urlparse(self.path)
                 if parsed.path=='/api/pilot':
-                    from .pilot import preset,assert_lock
+                    from .pilot import preset,assert_lock,available_device
                     from .prompts import templates
-                    config=resolve(preset());frozen=assert_lock(config,templates())
-                    return self.send(dict(config=preset(),protocol_hash=frozen['protocol_hash'],conversations=240,paired_blocks=120,logical_rows=2880,generations=2640))
+                    device=parse_qs(parsed.query).get('device',['auto'])[0]
+                    if device=='auto':device=available_device()
+                    raw=preset(device=device);config=resolve(raw)
+                    try:
+                        frozen=assert_lock(config,templates());ready=True;message='Frozen protocol ready'
+                    except ValueError as error:
+                        frozen={};ready=False;message=str(error)
+                    return self.send(dict(config=raw,ready=ready,message=message,protocol_hash=frozen.get('protocol_hash'),conversations=240,paired_blocks=120,logical_rows=2880,generations=2640))
                 if parsed.path=='/api/experiments':
                     entries=[]
                     for folder in sorted((ROOT/'results/experiments').glob('*'),key=lambda p:p.stat().st_mtime,reverse=True):

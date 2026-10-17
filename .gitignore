@@ -84,3 +84,8 @@ outputs/
 /REPOSITORY_AUDIT.md
 /STAGE2_IMPLEMENTATION.md
 /STAGE2_PRESERVATION.json
+
+# CUDA locks capture the GPU server environment; freeze once per collection host.
+/studies/pilot_cuda_v2.lock.json
+
+/studies/pilot_mps_v2.lock.json

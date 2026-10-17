@@ -1,25 +1,17 @@
-"""Restore the local manifest without changing the frozen collection code."""
+"""Verify tracked pilot inputs. No docs folder or manual copying is required."""
 from pathlib import Path
-import hashlib
 import json
-import shutil
 
 
 def main():
     root=Path(__file__).resolve().parents[1]
     source=root/'studies/pilot_question_selection.json'
-    target=root/'docs/pilot_question_selection.json'
-    lock=json.loads((root/'studies/pilot_protocol.lock.json').read_text())
-    expected=lock['descriptor']['selection_sha256']
-    if hashlib.sha256(source.read_bytes()).hexdigest()!=expected:
-        raise ValueError('Bundled question manifest differs from frozen protocol')
-    if target.exists():
-        if target.read_bytes()!=source.read_bytes():
-            raise ValueError('Existing local question manifest differs; refusing to overwrite it')
-    else:
-        target.parent.mkdir(parents=True,exist_ok=True)
-        shutil.copyfile(source,target)
-    print('Pilot question manifest ready. Frozen runtime and protocol unchanged.')
+    selection=json.loads(source.read_text())
+    for device in ('mps','cuda'):
+        config=json.loads((root/f'studies/pilot_{device}_v2.json').read_text())
+        if config['question_ids']!=selection['question_ids']:
+            raise ValueError('Pilot selection differs from bundled manifest')
+    print('Tracked pilot inputs ready. No docs folder is required.')
 
 
 if __name__=='__main__':main()

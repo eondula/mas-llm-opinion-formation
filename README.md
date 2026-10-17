@@ -8,7 +8,6 @@ From the repository root:
 
 ```bash
 source .venv/bin/activate
-python scripts/prepare_pilot.py
 python -m llm_mas dashboard
 ```
 
@@ -27,9 +26,25 @@ The separate experiment page provides settings, progress, and one summary table 
 
 ## Controlled pilot
 
-On the Experiments page click **Load controlled pilot**, optionally enter an experiment ID, then **Run experiment**. The frozen preset runs 10 balanced training questions across QQ, SS, QS and SQ, with 3 repetitions and 5 updates, natural starts and synchronous/no-peer branches sharing initialization. It produces 120 pairs, 240 conversations, 2,880 logical response rows and 2,640 generated responses. The stance audit runs first and stops collection if repeatability fails. All reports remain in the experiment directory.
+On the Experiments page click **Load controlled pilot**, optionally enter an experiment ID, then **Run experiment**. The frozen preset runs 10 balanced training questions across QQ, SS, QS and SQ, with 3 repetitions and 5 updates, natural starts and synchronous/no-peer branches sharing initialization. It produces 120 pairs, 240 conversations, 2,880 logical response rows and 2,640 generated responses. The stance audit runs first on the selected device and stops collection if repeatability fails. All reports remain in the experiment directory.
 
-Scientific settings are locked while this preset is active. **Custom experiment** restores editable controls. The saved configuration is [studies/pilot_experiment.json](studies/pilot_experiment.json). Run `python scripts/prepare_pilot.py` after cloning to restore the local question manifest required by the frozen protocol. The equivalent CLI launch is `python -m llm_mas run --config studies/pilot_experiment.json`.
+Scientific settings are locked while this preset is active. **Custom experiment** restores editable controls. The manifest loads directly from tracked `studies/pilot_question_selection.json`; no `docs/` directory or setup copy is required. In the dashboard choose **Pilot compute device → CUDA** for NVIDIA servers, or **MPS** for Apple Silicon, then **Load controlled pilot**. Detection prefers an available CUDA GPU.
+
+Freeze the new protocol once on the machine where collection will run:
+
+```bash
+# On an allocated GPU node, using your CUDA-enabled Python environment:
+python -m llm_mas pilot-freeze --device cuda
+python -m llm_mas dashboard --port 8766
+```
+
+For Apple Silicon use `pilot-freeze --device mps`. New locks capture source, prompts, dependencies, device and CUDA/GPU identity in local ignored files. The dashboard shows the required freeze command and disables pilot launch until it passes. Refresh the preset after freezing. A changed lock is never overwritten; start a separately versioned protocol for scientific changes.
+
+The v2 CUDA preset uses float32 weights for compatibility with NVIDIA GPUs that lack bfloat16 support; MPS retains bfloat16. These are separate protocols and should remain separate analysis conditions. Actual checkpoint and tokenizer commits remain pinned. Unavailable devices fail explicitly rather than falling back to CPU. A CUDA build of PyTorch and a GPU allocation are required; login nodes may have no CUDA device even when the cluster has GPUs.
+
+Equivalent CLI launch: `python -m llm_mas run --config studies/pilot_cuda_v2.json` or `studies/pilot_mps_v2.json`. The original v1 configuration and lock are retained for provenance; the updated runner rejects v1 collection and resume. Finish existing batches with their original checkout. Restart an old dashboard process after pulling so it loads the new manifest lookup.
+
+The dashboard uses shared border-box sizing and flexible grids, with a single-column layout on smaller viewports. Wide summary tables scroll inside labeled, keyboard-focusable regions. Skip links, visible keyboard focus, labeled progress, chart descriptions, touch targets and reduced-motion preferences follow [W3C reflow](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html), [focus](https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html) and [target-size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html) guidance. Automated structural checks do not establish full WCAG conformance.
 
 ## Outputs
 

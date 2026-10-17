@@ -271,8 +271,8 @@ def resolve(raw, planned=False):
         if not c.get('dataset') or c['stopping']!='fixed' or len(c['conditions'])!=2 or {v.get('schedule') for v in c['conditions']}!={c['schedule'],'no_peer'} or c['schedule']=='no_peer':
             raise ValueError('Paired controls require one peer branch and one no-peer branch with fixed horizon')
     if c.get('pilot_protocol'):
-        from .pilot import PROTOCOL,validate
-        if c['pilot_protocol']!=PROTOCOL:raise ValueError('Unknown pilot protocol')
+        from .pilot import paths,validate
+        paths(c['pilot_protocol'])
         if not planned:validate(c)
     return c
 
