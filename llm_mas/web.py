@@ -2,6 +2,7 @@
 import json
 import shlex
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -12,6 +13,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from .config import ROOT, resolve, run_path, scenario, validate_scenario, resolve_run_id
 from .storage import write
+from . import jobs
 from .planning import configurations
 from .locations import input_path, run_directories, historical_root
 
@@ -52,11 +54,12 @@ def live_status(status, modified, now=None):
 
 def active_runs():
     """Discover running CLI studies, including ones started before the server."""
+    managed=set(jobs.running(ROOT))
     try:
         output=subprocess.check_output(['ps','-ax','-o','command='],text=True)
     except (OSError,subprocess.SubprocessError):
-        return []
-    names=set()
+        return sorted(managed)
+    names=set(managed)
     for line in output.splitlines():
         try:
             args=shlex.split(line)
@@ -102,7 +105,8 @@ def serve(port=8766):
                     return self.send(entries)
                 if parsed.path=='/api/experiment':
                     query=parse_qs(parsed.query)
-                    current=state['run_id']
+                    discovered=active_runs()
+                    current=jobs.latest(ROOT,discovered) or state['run_id']
                     if current and not (ROOT/'results/experiments'/current).exists():
                         current=None
                     name=query.get('run_id',[current])[0]
@@ -111,20 +115,22 @@ def serve(port=8766):
                     folder=ROOT/'results/experiments'/name if name else None
                     config_file=ROOT/'results/experiments/configurations'/f'{name}.json' if name else None
                     proc=state['process'] if name==state['run_id'] else None
-                    running=(proc is not None and proc.poll() is None) or name in active_runs()
-                    worker_busy=(state['process'] is not None and state['process'].poll() is None) or bool(active_runs())
+                    running=(proc is not None and proc.poll() is None) or name in discovered
+                    worker_busy=(state['process'] is not None and state['process'].poll() is None) or bool(discovered)
                     if folder and not folder.exists() and not (config_file and config_file.exists()) and proc is None:
                         return self.send({'error':'Experiment not found'},status=404)
                     status_file=folder/'status.json' if folder else None
                     status=json.loads(status_file.read_text()) if status_file and status_file.is_file() else {'phase':'starting' if running else 'idle'}
                     if running and status_file and status_file.is_file():
                         status=live_status(status,status_file.stat().st_mtime)
-                    if not running and folder and status.get('phase') not in ('idle','complete','failed','cancelled'):
+                    worker_host=jobs.worker_host(folder) if folder else None
+                    remote=bool(worker_host and worker_host!=socket.gethostname())
+                    if not running and not remote and folder and status.get('phase') not in ('idle','complete','failed','cancelled'):
                         status=dict(status,phase='failed',error='Experiment worker stopped before completion. See worker.log and error.log in the experiment directory.')
                     summary_file=folder/'summary.json' if folder else None
                     summary=json.loads(summary_file.read_text()).get('rows',[]) if status['phase']=='complete' and summary_file and summary_file.exists() else []
                     return self.send(dict(run_id=name,status=status,running=bool(running),worker_busy=worker_busy,
-                                          can_stop=proc is not None and proc.poll() is None,summary=summary,
+                                          worker_host=worker_host,remote_progress=remote,can_stop=(proc is not None and proc.poll() is None) or bool(folder and running and jobs.worker(folder) is not None),summary=summary,
                                           output_directory=str(folder.relative_to(ROOT)) if folder else None,
                                           report_available=bool(folder and (folder/'index.html').exists())))
                 if parsed.path=='/api/analyses':
@@ -254,8 +260,12 @@ def serve(port=8766):
                 with lock:
                     proc=state['process']
                     if self.path=='/api/stop':
-                        if data.get('run_id') and data['run_id']!=state['run_id']:raise ValueError('This is not the active run managed by this dashboard')
-                        if proc and proc.poll() is None:proc.send_signal(signal.SIGINT)
+                        name=data.get('run_id') or state['run_id'] or jobs.latest(ROOT,active_runs())
+                        if name:resolve_run_id(name)
+                        if name==state['run_id'] and proc and proc.poll() is None:
+                            proc.send_signal(signal.SIGINT)
+                        elif not name or not jobs.stop(ROOT/'results/experiments'/name):
+                            raise ValueError('No verified active worker is available for this run')
                         return self.send({'stopping':True})
                     if self.path=='/api/experiment':
                         if proc and proc.poll() is None or active_runs():
@@ -282,7 +292,8 @@ def serve(port=8766):
                         with (folder/'worker.log').open('w') as log:
                             command=[sys.executable,'-u','-m','llm_mas','run','--config',str(configuration),'--run-id',name]
                             try:
-                                process=subprocess.Popen(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT)
+                                process=subprocess.Popen(command,cwd=ROOT,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True,close_fds=True)
+                                jobs.register(folder,process,command)
                             except BaseException as error:
                                 write(folder/'status.json',dict(phase='failed',error=str(error)))
                                 raise

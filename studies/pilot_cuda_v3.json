@@ -1,0 +1,94 @@
+{
+  "mode": "experiment",
+  "output_layout": "experiment",
+  "pilot_protocol": "strategyqa-pilot-v3-cuda",
+  "models": [
+    "Qwen/Qwen2.5-1.5B-Instruct",
+    "Qwen/Qwen2.5-1.5B-Instruct"
+  ],
+  "agents": 2,
+  "agent_configuration": "heterogeneous",
+  "model_configurations": [
+    [
+      "Qwen/Qwen2.5-1.5B-Instruct",
+      "Qwen/Qwen2.5-1.5B-Instruct"
+    ],
+    [
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+    ],
+    [
+      "Qwen/Qwen2.5-1.5B-Instruct",
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+    ],
+    [
+      "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+      "Qwen/Qwen2.5-1.5B-Instruct"
+    ]
+  ],
+  "model_revisions": {
+    "Qwen/Qwen2.5-1.5B-Instruct": {
+      "model": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "tokenizer": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
+    },
+    "HuggingFaceTB/SmolLM2-1.7B-Instruct": {
+      "model": "31b70e2e869a7173562077fd711b654946d38674",
+      "tokenizer": "31b70e2e869a7173562077fd711b654946d38674"
+    }
+  },
+  "expected_dtype": "torch.float32",
+  "question_count": 10,
+  "question_balance": "equal",
+  "question_seed": 42,
+  "initialization": "natural",
+  "rounds": 5,
+  "repetitions": 3,
+  "schedule": "synchronous",
+  "conditions": [
+    {
+      "schedule": "synchronous"
+    },
+    {
+      "schedule": "no_peer"
+    }
+  ],
+  "paired_control": true,
+  "decoding": "fixed_sampling",
+  "sampling_method": "combined",
+  "sampling": {
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "seed": 42
+  },
+  "seed": 42,
+  "max_argument_tokens": 256,
+  "device": "cuda",
+  "sentiment": true,
+  "message_similarity": true,
+  "stopping": "fixed",
+  "stance_audit": true,
+  "question_ids": [
+    "d8262444ec05bdbe1094",
+    "70e7c1ad517f7f78d21d",
+    "7870b1cef39a4f685911",
+    "b5fbec7f7dd187a2746e",
+    "f66cf3ddea2d87e8e572",
+    "14806a45b707fc56e4dd",
+    "5170cfed313d2de67942",
+    "cdd68b5d76364d35779f",
+    "71d5af08c0cfb9565a54",
+    "7c5daad08c46d9410a81"
+  ],
+  "dataset": {
+    "name": "strategyqa",
+    "path": "data/strategyqa",
+    "partition": "train",
+    "source_url": "https://storage.googleapis.com/ai2i/strategyqa/data/strategyqa_dataset.zip",
+    "release_sha256": "4911d85eb6721a93bed7645419df77e721808b32b9785dee14ad80e6249e0a90",
+    "source_sha256": "728e28b7d6bdfe6da3a0a5f8c5923113a79063d199e960cfcc9f8a3ab34cd92c",
+    "release_verified": true,
+    "split_version": "normalized-question-sha256-70-15-15-v1",
+    "split": "train",
+    "split_seed": 42
+  }
+}

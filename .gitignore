@@ -89,3 +89,6 @@ outputs/
 /studies/pilot_cuda_v2.lock.json
 
 /studies/pilot_mps_v2.lock.json
+
+/studies/pilot_cuda_v3.lock.json
+/studies/pilot_mps_v3.lock.json

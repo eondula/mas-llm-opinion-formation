@@ -40,11 +40,27 @@ python -m llm_mas dashboard --port 8766
 
 For Apple Silicon use `pilot-freeze --device mps`. New locks capture source, prompts, dependencies, device and CUDA/GPU identity in local ignored files. The dashboard shows the required freeze command and disables pilot launch until it passes. Refresh the preset after freezing. A changed lock is never overwritten; start a separately versioned protocol for scientific changes.
 
-The v2 CUDA preset uses float32 weights for compatibility with NVIDIA GPUs that lack bfloat16 support; MPS retains bfloat16. These are separate protocols and should remain separate analysis conditions. Actual checkpoint and tokenizer commits remain pinned. Unavailable devices fail explicitly rather than falling back to CPU. A CUDA build of PyTorch and a GPU allocation are required; login nodes may have no CUDA device even when the cluster has GPUs.
+The v3 CUDA preset uses float32 weights for compatibility with NVIDIA GPUs that lack bfloat16 support; MPS retains bfloat16. These are separate protocols and should remain separate analysis conditions. Actual checkpoint and tokenizer commits remain pinned. Unavailable devices fail explicitly rather than falling back to CPU. A CUDA build of PyTorch and a GPU allocation are required; login nodes may have no CUDA device even when the cluster has GPUs.
 
-Equivalent CLI launch: `python -m llm_mas run --config studies/pilot_cuda_v2.json` or `studies/pilot_mps_v2.json`. The original v1 configuration and lock are retained for provenance; the updated runner rejects v1 collection and resume. Finish existing batches with their original checkout. Restart an old dashboard process after pulling so it loads the new manifest lookup.
+Equivalent CLI launch: `python -m llm_mas run --config studies/pilot_cuda_v3.json` or `studies/pilot_mps_v3.json`. The earlier v1/v2 configurations and locks are retained for provenance; this release uses v3 to keep its changed execution source separate from existing batches. The updated runner rejects collection or resume under retired versions. Finish existing batches with their original checkout. Restart an old dashboard process after pulling so it loads the new manifest lookup.
 
 The dashboard uses shared border-box sizing and flexible grids, with a single-column layout on smaller viewports. Wide summary tables scroll inside labeled, keyboard-focusable regions. Skip links, visible keyboard focus, labeled progress, chart descriptions, touch targets and reduced-motion preferences follow [W3C reflow](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html), [focus](https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html) and [target-size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html) guidance. Automated structural checks do not establish full WCAG conformance.
+
+## Background execution and reconnecting
+
+**Finish any existing foreground pilot before pulling this update.** Changing source files during a frozen collection invalidates that batch. New background behavior cannot be applied retroactively to an already-running foreground process.
+
+After updating and freezing the v3 protocol on your GPU node, start the dashboard without tying it to an SSH terminal:
+
+```bash
+bash scripts/start_dashboard.sh 8766
+```
+
+The launcher uses `.venv/bin/python` by default. For another CUDA-enabled environment, set `OPINION_PYTHON` to its Python executable. The service log is `results/dashboard.log`. Launch the pilot through the Experiments page as usual. Its worker starts in a separate session with stdin disconnected and stdout/stderr redirected to `results/experiments/<id>/worker.log`; closing the browser, SSH connection or dashboard terminal does not interrupt that new worker.
+
+After reconnecting, recreate your SSH port-forward and open `/experiment.html`. The page automatically follows the latest active experiment, otherwise the latest launched experiment. Use **Follow latest run** to return after inspecting an older saved summary. If the dashboard service stopped, run the launcher again on the same node. It reconnects to saved worker identity and progress, and **Stop** still sends an interrupt to that verified worker. PID creation time, owner and command are checked before a reconnected process can be controlled. A reused PID or an unrelated process is never treated as the worker. Runs observed from another node show their last saved progress without claiming live control there.
+
+`worker.json`, `status.json`, logs and results persist outside the dashboard process. Workers continue if only the dashboard is restarted; stopping a pilot still cancels it. This does not survive a server reboot or extend a GPU allocation. On a scheduler-managed cluster, use the site's batch-job mechanism for an allocation that outlives SSH; closing an interactive allocation can terminate its jobs regardless of backgrounding.
 
 ## Outputs
 
