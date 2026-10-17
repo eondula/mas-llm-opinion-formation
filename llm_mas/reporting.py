@@ -36,7 +36,7 @@ def export(path):
         import networkx as nx
         graph=nx.DiGraph();states={}
         for row in record['rows']:states.setdefault(row['round'],{})[row['agent']]=row['strategy']
-        labels=[''.join(str(s[n]) for n in sorted(s)) for _,s in sorted(states.items())]
+        labels=[''.join(({1:'Y',2:'N'}.get(s[n],'?') if record.get('dataset') else str(s[n])) for n in sorted(s)) for _,s in sorted(states.items())]
         graph.add_nodes_from(labels)
         for a,b in zip(labels,labels[1:]):graph.add_edge(a,b,weight=graph.get_edge_data(a,b,{}).get('weight',0)+1)
         fig,ax=plt.subplots(figsize=(6,5));positions=nx.circular_layout(graph)
@@ -110,6 +110,8 @@ def export(path):
             save(fig,f'{filename}_{i:03d}','appendix')
     fig,ax=plt.subplots(figsize=(11,2));ax.axis('off')
     steps=['History','Candidate scores','Strategy','Public message','Peer delivery']
+    if records and records[0][1].get('dataset'):
+        steps=['Question/history','Own answer/reason','Peer delivery','Reconsideration','Separate stance probes']
     for i,step in enumerate(steps):
         ax.text(.1+i*.2,.5,step,ha='center',va='center',bbox=dict(boxstyle='round',facecolor='#eaf0f8'))
         if i<4:ax.annotate('',xy=(.19+i*.2,.5),xytext=(.15+i*.2,.5),arrowprops={'arrowstyle':'->'})

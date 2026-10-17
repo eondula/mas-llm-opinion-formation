@@ -7,7 +7,7 @@ from copy import deepcopy
 from itertools import product
 import json
 from .prompts import initial, for_condition
-from .runner import write
+from .storage import write
 
 
 def run(path, config, texts, runtimes, progress, layer_progress=None):

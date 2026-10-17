@@ -1,10 +1,12 @@
 """Independent, traceable analysis jobs over immutable saved conversations."""
+from .trajectories import read_conversation
 import csv
 import json
 import shutil
 from pathlib import Path
 from .config import ROOT, run_path, resolve_run_id, digest
-from .runner import write
+from .storage import write
+from .locations import run_directories
 
 MODULES = {'replay', 'mechanistic', 'heads', 'source_spans', 'continuation'}
 
@@ -16,12 +18,13 @@ def read_record(run_id, task):
     file = root/'conversations'/f'{task}.json'
     if not file.is_file():
         raise ValueError('Saved conversation not found')
-    return root, file, json.loads(file.read_text())
+    return root, file, read_conversation(file)
 
 
 def list_analyses():
     items=[]
-    for file in sorted((ROOT/'results/studies').glob('*/manifest.json')):
+    for directory in run_directories(ROOT):
+        file=directory/'manifest.json'
         try:
             manifest=json.loads(file.read_text())
             if manifest.get('kind')!='saved_run_analysis':continue
@@ -37,11 +40,11 @@ def catalog(run_id):
     root = run_path(run_id)
     records = []
     for file in sorted((root/'conversations').glob('*.json')):
-        r = json.loads(file.read_text())
+        r = read_conversation(file)
         records.append(dict(task=file.stem, title=r['scenario']['title'], config=r['config'],
             events=[dict(agent=x['agent'], round=x['round'], model=x['model']) for x in r['rows'] if x['round'] > 0 and x.get('deliveries')]))
     def url(p):
-        return '/results/'+str(p.relative_to(ROOT/'results/studies'))
+        return '/results/'+run_id+'/'+p.relative_to(root).as_posix()
     figures = [dict(name=str(p.relative_to(root/'figures')), png=url(p),
                    pdf=url(p.with_suffix('.pdf')) if p.with_suffix('.pdf').exists() else None,
                    csv=url(p.with_suffix('.csv')) if p.with_suffix('.csv').exists() else None)
@@ -59,7 +62,9 @@ def catalog(run_id):
         tables.append(dict(name=file.stem, csv=url(file), header=header, rows=rows))
     status = json.loads((root/'status.json').read_text()) if (root/'status.json').exists() else {}
     coverage=json.loads((root/'figures/coverage.json').read_text()) if (root/'figures/coverage.json').exists() else {}
+    evaluation=json.loads((root/'analysis/evaluation.json').read_text()).get('summary') if (root/'analysis/evaluation.json').is_file() else None
     return dict(coverage=coverage, run_id=run_id, records=records, figures=figures, tables=tables, status=status,
+                dataset=records[0]['config'].get('dataset') if records else None, evaluation=evaluation,
                 zip=url(root/'paper_outputs.zip') if (root/'paper_outputs.zip').exists() else None)
 
 
@@ -68,6 +73,8 @@ def validate(options):
     modules = options.get('modules', [])
     if not isinstance(modules, list) or set(modules)-MODULES:
         raise ValueError('Unsupported saved-run analysis')
+    if modules and record.get('dataset'):
+        raise ValueError('Historical intervention analyses are not StrategyQA update-model analyses. Inspect the saved trajectories and correctness tables instead.')
     if modules:
         if not any(r['agent']==options.get('agent') and r['round']==options.get('round') and r.get('deliveries') for r in record['rows']):
             raise ValueError('Select an agent/round with peer delivery')

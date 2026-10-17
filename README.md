@@ -1,114 +1,76 @@
-# Opinion Lab
+# Opinion formation experiments
 
-Run language model agent conversations through a local dashboard or the terminal.
+Run repeated StrategyQA experiments with language-model agents, then analyze opinion changes, correctness, disagreement, consensus and message cosine similarity. One configuration-driven engine supports independent reasoning and synchronous or sequential deliberation.
 
-## Hardware requirements
+## Start the experiment page
 
-- Windows or Linux with Python 3.11 or newer and Git.
-- An NVIDIA GPU with a compatible driver and CUDA-enabled PyTorch for accelerated runs. The mechanistic pilots were run on an RTX 3090 with 24 GB VRAM; this is a tested configuration, not a minimum requirement.
-- Enough RAM and GPU memory for the selected checkpoints and conversation histories. Memory needs increase with model size, context length and float32 execution.
-- Internet access and disk space for model downloads on first use. Models are cached locally.
+From the repository root:
 
-CPU execution is available but slower. Full study commands below explicitly select CUDA.
-
-## Install
-
-Clone the repository and enter its directory:
-
-```sh
-git clone https://github.com/eondula/mas-llm-opinion-formation.git
-cd mas-llm-opinion-formation
+```bash
+source .venv/bin/activate
+python scripts/prepare_pilot.py
+python -m llm_mas dashboard
 ```
 
-**Linux:**
+Open **http://localhost:8766** for the agent conversation dashboard, or **http://localhost:8766/experiment.html** for repeated experiments. For a fresh environment:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+python -m llm_mas dataset download
 ```
 
-**Windows PowerShell:**
+The separate experiment page provides settings, progress, and one summary table after completion. The conversation dashboard retains agents, chat, playback, stance and sentiment plots. Choose models, agents, questions, number of runs, updates, schedule, and natural or forced initial Yes/No answers. Sampling uses saved per-agent seeds. Greedy repetitions may be identical.
 
-```powershell
-py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+**Number of runs** means repetitions of the same selected question set with fresh histories. Ten runs of five questions produce 50 conversations per condition. An optional matched no-peer control doubles that count. Initial judgments are independent; forced answers apply only to the first turn.
+
+## Controlled pilot
+
+On the Experiments page click **Load controlled pilot**, optionally enter an experiment ID, then **Run experiment**. The frozen preset runs 10 balanced training questions across QQ, SS, QS and SQ, with 3 repetitions and 5 updates, natural starts and synchronous/no-peer branches sharing initialization. It produces 120 pairs, 240 conversations, 2,880 logical response rows and 2,640 generated responses. The stance audit runs first and stops collection if repeatability fails. All reports remain in the experiment directory.
+
+Scientific settings are locked while this preset is active. **Custom experiment** restores editable controls. The saved configuration is [studies/pilot_experiment.json](studies/pilot_experiment.json). Run `python scripts/prepare_pilot.py` after cloning to restore the local question manifest required by the frozen protocol. The equivalent CLI launch is `python -m llm_mas run --config studies/pilot_experiment.json`.
+
+## Outputs
+
+New experiments are saved under:
+
+```text
+results/experiments/<experiment-id>/
+  config.json, manifest.json, environment.json
+  status.json, worker.log              # worker.log for page-launched runs
+  index.html, REPORT.md, summary.json, RESULTS.md
+  inputs/                             # dataset selection, prompts, evaluator labels
+  conversations/                      # messages, raw measurements and delivery provenance
+  analysis/behavioral.json
+  analysis/evaluation.json, analysis/message_similarity.json
+  tables/                             # summary, turns, trajectories, groups, controls
+  figures/                            # indexed PNG/PDF figures and plotted-data CSVs
+    behavioral/                       # correctness, reversals, stability, groups, peers
 ```
 
-Use a CUDA-enabled PyTorch build compatible with your GPU driver. Check GPU availability after installation:
+Correctness labels are used only after simulation. The original summed candidate log-likelihood scorer is retained: margin = log P(Yes) − log P(No), stance = tanh(margin / 2). Generated answers and measured stance remain separate.
 
-```sh
-python -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('PyTorch CUDA:', torch.version.cuda)"
+Saved HTML reports include metric definitions, denominators and detailed exports. Use `python -m llm_mas dataset info` to inspect dataset and split provenance.
+
+## Terminal execution
+
+```bash
+python -m llm_mas run --config studies/experiment.json --dry-run
+python -m llm_mas run --config studies/experiment.json --repetitions 10 --run-id experiment_001
 ```
 
-Run the remaining commands from the repository root with the environment activated. They work in both Linux terminals and Windows PowerShell.
+The preset uses the new experiment directory. Every future StrategyQA run generates the full report, detailed figures, CSV/JSON tables and refreshed ZIP automatically. Cross-experiment reports are saved in `results/experiments/comparisons/`. Change question count, models, rounds, conditions and decoding in the JSON configuration. Regenerate complete reports for saved StrategyQA runs without any model inference:
 
-## Run the dashboard
-
-```sh
-python -m llm_mas dashboard
+```bash
+python -m llm_mas reports --run-id experiment_001
+python -m llm_mas reports --all
 ```
 
-Open **http://127.0.0.1:8766**. Select the models, scenario and conversation settings, then start a run. Use **Quick preview** for a single conversation and **Study** for a sweep. Select CUDA for GPU execution. Saved runs and figures are accessible from the dashboard.
+## Preservation and validation
 
-For interactive testing, select **Discussion prompt → Discussion then decision**. After initialization, each agent discusses the available messages before reassessing its choice. Existing controls still apply. Scored choice uses endorsement scores after discussion; generated choice adds a separate JSON decision call. The dedicated prompt is `prompts/discussion_then_decision.txt`. Saved response records include the discussion generation, pre-discussion scores, decision scores and post-response scores. Original, Open discussion and Topic discussion remain available.
+The agent conversation dashboard remains active alongside the new experiment page. Documentation, tests, archived implementations and saved research runs remain local and are excluded from new commits.
 
-Use the terminal presets below to run the exact full behavioral, fixed and reversed study grids.
-
-Select **Run mode → Joint decision task** to give agents a shared recommendation task. Edit the team brief and choose fixed or adaptive stopping; other controls remain available. The decision sheet shows each agent's choice and reason, plus shared choice or unresolved disagreement. It does not force consensus or add a vote. The task prompt is `prompts/joint_task.txt`; the final sheet is saved as `joint_decision.json` in the run folder.
-
-## Run from the terminal
-
-Start with a short conversation:
-
-```sh
-python -m llm_mas preview --scenario storage --rounds 3 --device cuda --run-id preview_check
+```bash
+MPLCONFIGDIR=/tmp/opinion-lab-matplotlib python -m unittest discover -s tests/refactor
 ```
-
-Run a small study before launching the full presets:
-
-```sh
-python -m llm_mas study --config studies/full_behavioral_smoke.json --device cuda --run-id full_smoke
-```
-
-Use a new run ID for each new run. Add `--dry-run` to a study command to inspect its tasks without loading models.
-
-## Run the three studies
-
-The presets use Sensor and Storage, two agents, Qwen2.5-1.5B, Qwen2.5-3B and SmolLM2-1.7B assignments, and both scored and generated choice. Run jobs sequentially when sharing one GPU.
-
-| Study | Conversations | Observation |
-|---|---:|---|
-| Behavioral | 480 | Adaptive stopping, up to 15 updates; natural and forced starts, interactive and no-peer schedules |
-| Full fixed | 120 | Natural interactive conditions continued through all 15 updates |
-| Reversal | 120 | Natural interactive conditions with reversed alternative display and candidate-block order; adaptive stopping |
-
-**Behavioral:**
-
-```sh
-python -m llm_mas study --config studies/full_behavioral.json --device cuda --run-id full_behavioral_new
-```
-
-**Full fixed:**
-
-```sh
-python -m llm_mas study --config studies/full_behavioral_fixed.json --device cuda --run-id full_fixed_new
-```
-
-**Reversal:**
-
-```sh
-python -m llm_mas study --config studies/full_behavioral_reversed.json --device cuda --run-id full_reversed_new
-```
-
-Results are saved in `results/studies/<run-id>/`: conversation JSON, prompts and configuration, figures, and CSV measurements under `tables/`. Save new research figures as PNG with CSV data sufficient to reproduce them; do not create PDF copies.
-
-Resume an interrupted run with unchanged code and configuration, or regenerate its figures from saved data:
-
-```sh
-python -m llm_mas resume --run-id full_behavioral_new
-python -m llm_mas figures --run-id full_behavioral_new
-```
-
-For **Joint decision task**, select **Agent-negotiated closure** to stop through explicit proposal and unanimous confirmation. Closure uses separate greedy control calls and no similarity threshold. All agents review the same completed round; a veto or invalid signal continues discussion. Closure may preserve disagreement. The dashboard shows control reasons, and raw controls are saved in termination records. No peer disables this extra exchange. The maximum rounds remain a budget safeguard. Edit `prompts/closure.txt` to change the control instruction.

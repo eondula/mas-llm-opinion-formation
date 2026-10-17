@@ -1,0 +1,3 @@
+Question: {question}
+
+The possible answers are Yes and No.

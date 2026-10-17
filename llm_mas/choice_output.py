@@ -43,6 +43,8 @@ def instruction(texts,scenario):
 def display_message(row):
     """Format parseable generated text without changing the recorded decision."""
     raw = row.get('message', '')
+    if 'answer' in row:
+        return row['answer']+'\n'+row.get('argument', '') if row.get('answer') in ('Yes','No') else raw
     strategy, explanation, status = parse(raw)
     if status == 'valid':
         text = f'Strategy {strategy}\n{explanation}'

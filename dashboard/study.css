@@ -137,3 +137,8 @@ main{padding:30px 36px}.context{padding:5px 0 22px}.context h2{font-size:32px;fo
 #setup select[multiple] option{padding:8px 10px;margin:2px 0;border-radius:6px}
 #setup select[multiple] option:checked{background:var(--button);color:var(--on-button)}
 #setup input:not([type=checkbox]),#setup textarea{border-radius:10px;font-size:13px}
+
+/* Independent reasoning retains the existing agent and message components. */
+.arena.single-agent { grid-template-columns: minmax(0, 1fr); }
+.arena.single-agent .exchange { display: none; }
+.arena.single-agent .agent { grid-column: 1; justify-self: center; width: min(100%, 360px); }

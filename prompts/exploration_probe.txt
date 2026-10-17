@@ -1,0 +1,7 @@
+Given the scenario and discussion so far, state your current position.
+Return exactly one of these endorsement statements:
+
+Strategy 1: {candidate_1}
+Strategy 2: {candidate_2}
+
+Return only the endorsement statement, without the strategy label.

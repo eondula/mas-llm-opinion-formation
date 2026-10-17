@@ -1,13 +1,14 @@
 """Leave-one-conversation-out regression, with persistence as a baseline."""
+from .trajectories import read_conversation
 import json
 import numpy as np
-from .runner import write
+from .storage import write
 
 
 def run(path):
     examples=[]
     for file in sorted((path/'conversations').glob('*.json')):
-        record=json.loads(file.read_text())
+        record=read_conversation(file)
         for row in record['rows']:
             if not row['decision'] or row['round']==0:continue
             examples.append(dict(task=file.stem,agent=row['agent'],model=row['model'],round=row['round'],
@@ -42,7 +43,7 @@ def predict_groups(path):
         if len(rows)==4:coefficients[key]=np.linalg.solve(x,np.array([r['after']['margin'] for r in rows]))
     results=[]
     for source in sorted((path/'conversations').glob('*.json')):
-        record=json.loads(source.read_text());rows=record['rows'];c=record['config'];initial=[r for r in rows if r['round']==0]
+        record=read_conversation(source);rows=record['rows'];c=record['config'];initial=[r for r in rows if r['round']==0]
         names=[r['agent'] for r in initial];models={r['agent']:r['model'] for r in initial};state={r['agent']:r['strategy'] for r in initial}
         if len(names)!=2 or c['schedule']=='no_peer':continue
         if any((models[n],record['scenario']['id']) not in coefficients for n in names):continue

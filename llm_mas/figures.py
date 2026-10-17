@@ -1,4 +1,5 @@
 """All plotting reads saved data; never loads language models."""
+from .trajectories import read_conversation
 import csv
 import json
 from pathlib import Path
@@ -26,7 +27,7 @@ def render(path):
     folder.mkdir(exist_ok=True)
     files, records = [], []
     for source in sorted((path/'conversations').glob('*.json')):
-        data = json.loads(source.read_text())
+        data = read_conversation(source)
         rows = data['rows']
         agents = list(dict.fromkeys(r['agent'] for r in rows))
         title = f"{data['scenario']['title']} | {data['config']['schedule']} | {data['config']['initialization']} | {data['config']['argument_mode']}"
@@ -54,8 +55,10 @@ def render(path):
                     decision_stance=r['decision']['stance'] if r['decision'] else None,margin=r['post']['margin'],sentiment=r.get('sentiment'),
                     absolute_stance_change=float(ds[j-1]) if j else None,absolute_sentiment_change=float(dv[j-1]) if j and np.isfinite(dv[j-1]) else None))
         for r in rows:
-            transcript.extend([f"Round {r['round']} — {r['agent']} ({r['model']}) — S{r['strategy']} — post stance {r['post']['stance']:+.6f}",r['message'],''])
-        for ax,label in zip(axes,('Post-response stance: S2 (−) to S1 (+)','Public-message sentiment')):
+            answer = r.get('answer') or 'Invalid' if 'answer' in r else 'S'+str(r['strategy'])
+            transcript.extend([f"Round {r['round']} — {r['agent']} ({r['model']}) — {answer} — post stance {r['post']['stance']:+.6f}",r['message'],''])
+        stance_label = 'Post-response stance: No (−) to Yes (+)' if data.get('dataset') else 'Post-response stance: S2 (−) to S1 (+)'
+        for ax,label in zip(axes,(stance_label,'Public-message sentiment')):
             ax.set(xlabel='Round (0 = initialization)',ylabel=label,ylim=(-1.05,1.05))
             ax.axhline(0,color='gray',linewidth=.7)
             ax.legend()

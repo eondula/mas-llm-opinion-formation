@@ -1,0 +1,4 @@
+{turn_instruction}
+
+Return your reply as a JSON object with these fields:
+{{"answer": "Yes or No", "explanation": "your reasoning and response"}}

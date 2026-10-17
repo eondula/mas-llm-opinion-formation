@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Opinion Formation · Experiments</title><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/study.css"><link rel="stylesheet" href="/site.css"><link rel="stylesheet" href="/experiment.css"><script src="/model-controls.js" defer></script><script src="/site.js" defer></script><script src="/experiment.js" defer></script></head>
+<body class="experiment-page">
+<header class="site-header"><h1>Opinion Lab</h1><nav class="top-nav" aria-label="Main navigation"><a href="/">Agent conversation</a><a href="/experiment.html" aria-current="page">Experiments</a></nav><button id="theme-toggle" type="button">Dark theme</button></header>
+<div class="app-layout experiment-layout"><aside class="sidebar"><section id="setup"><h2>Configure experiment</h2>
+<div class="actions"><button id="pilot-preset" type="button">Load controlled pilot</button><button id="custom-preset" type="button">Custom experiment</button></div><p id="pilot-help" class="hint"></p>
+<form id="configuration"><fieldset id="settings"><legend class="sr-only">Experiment configuration</legend><div class="setup-grid">
+<label>Experiment ID <input id="experiment-id" placeholder="Generated automatically" pattern="[A-Za-z0-9_-]+"></label>
+<label>Number of runs <input id="runs" type="number" value="10" min="1" required></label>
+<label>Questions per run <input id="question-count" type="number" value="5" min="1" required></label>
+<label>Agents <input id="agents" type="number" value="2" min="1" required></label>
+<label>Agent configuration<select id="agent-configuration"><option value="homogeneous">Homogeneous · shared checkpoint</option><option value="heterogeneous">Heterogeneous · choose per agent</option></select></label>
+<label id="shared-model-label">Shared model<select id="shared-model"></select></label><div id="agent-models" hidden></div><p id="model-help"></p><textarea id="models" hidden aria-hidden="true"></textarea>
+<label>Update rounds <input id="rounds" type="number" value="3" min="0" required></label>
+<label>Communication <select id="schedule"><option value="synchronous">Synchronous</option><option value="sequential">Sequential · forward</option><option value="reverse_sequential">Sequential · reverse</option><option value="no_peer">No peer</option></select></label>
+<label>Initial answers <select id="initialization"><option value="natural">Natural</option><option value="forced">Forced · Yes/No per agent</option></select></label>
+<div id="forced-answers" class="grid" hidden></div>
+<label>Source partition <select id="partition"><option value="train">Labeled training pool</option><option value="test">Official test · unlabeled</option></select></label>
+<label>Research split <select id="split"><option value="train">Train</option><option value="validation">Validation</option><option value="test">Held-out test</option><option value="all">All</option></select></label>
+<label>Split seed <input id="split-seed" type="number" value="42" min="0" required></label>
+<label>Question label balance<select id="question-balance"><option value="random">Random</option><option value="equal">Equal Yes and No</option></select></label>
+<label>Question sampling seed <input id="question-seed" type="number" value="42" min="0" required></label>
+<label>Response decoding <select id="decoding"><option value="fixed_sampling">Sampling</option><option value="greedy">Greedy</option></select></label>
+<label>Generation seed <input id="seed" type="number" value="42" min="0" max="4294967295" required></label>
+<div id="sampling-controls"><label>Sampling method<select id="sampling-method"><option value="temperature">Temperature only</option><option value="top_p">Top-p only</option><option value="combined" selected>Temperature and top-p</option></select></label><label id="temperature-label">Temperature <input id="temperature" type="number" value="0.7" min="0.01" step="0.05" required></label>
+<label id="top-p-label">Top-p <input id="top-p" type="number" value="0.9" min="0.01" max="1" step="0.05" required></label><p id="sampling-help" class="hint"></p></div>
+<label>Response token budget <input id="tokens" type="number" value="256" min="16" required></label>
+<label>Device <select id="device"><option value="auto">Automatic</option><option value="cpu">CPU</option><option value="cuda">CUDA</option><option value="mps">MPS</option></select></label>
+
+<label>Questions (optional selection)<select id="questions" multiple size="5"></select></label><p id="dataset-help" class="hint">Loading questions…</p>
+<label class="wide">Question IDs · optional override, separated by commas or whitespace <textarea id="question-ids" rows="2" placeholder="Leave empty to sample questions"></textarea></label>
+<label class="check"><input id="control" type="checkbox"> Include matched no-peer control</label>
+<label class="check"><input id="message-similarity" type="checkbox" checked> Save message cosine similarity</label>
+<label class="check"><input id="sentiment" type="checkbox" checked> Save sentiment measurements</label>
+</div><p class="hint">Each run repeats the same selected question set with fresh histories. Sampling uses distinct saved seeds; greedy repeats may be identical. Forced answers apply only at initialization. A no-peer control doubles the conversations.</p></fieldset>
+<div class="actions"><button id="preview-prompts" type="button">Preview prompts</button><button id="start" type="submit">Run experiment</button><button id="stop" type="button" disabled>Stop</button></div></form></section></aside><main class="experiment-main"><section class="context"><div><h2>Repeated experiments</h2><p>Run independent repetitions and inspect the summary. Detailed results and figures are saved in the experiment directory.</p></div></section>
+<section class="run-progress" aria-labelledby="progress-title"><h2 id="progress-title">Progress</h2><div class="saved"><label>Saved experiment <select id="saved"><option value="">Select an experiment</option></select></label><button id="open" type="button">Open summary</button></div><p id="phase" role="status" aria-live="polite">Idle</p><progress id="progress" max="1" value="0"></progress><p id="timing"></p><p id="output" class="hint"></p><p><a id="report-link" hidden target="_blank" rel="noopener">Open full results report</a> <a id="comparison-link" hidden href="/results/comparisons/index.html" target="_blank" rel="noopener">Compare saved experiments</a></p><p id="error" role="alert"></p></section>
+<section id="summary-section" hidden aria-labelledby="summary-title"><h2 id="summary-title">Experiment summary</h2><p class="hint">Accuracy includes invalid answers as unsuccessful. Majority accuracy also counts ties as unsuccessful. — means unavailable. Rows separate experimental conditions and dataset splits.</p><div class="table-wrap"><table id="summary"><thead><tr><th>Models</th><th>Agents</th><th>Schedule</th><th>Start</th><th>Split</th><th>Runs</th><th>Questions</th><th>Conversations</th><th>Initial accuracy</th><th>Final accuracy</th><th>Initial disagreement</th><th>Final consensus</th><th>Final majority accuracy</th><th>Mean |Δstance|</th><th>Reversals</th><th>Correct → incorrect</th><th>Incorrect → correct</th><th>Final dispersion</th><th>Mean adjacent cosine</th><th>Invalid</th></tr></thead><tbody></tbody></table></div></section>
+</main></div><footer>LLM-MAS Opinion Formation</footer><dialog id="prompt-dialog" aria-labelledby="prompt-title"><div class="dialog-heading"><h2 id="prompt-title">Prompt preview</h2><button id="close-prompt" type="button">Close</button></div><pre id="prompt"></pre></dialog></body></html>

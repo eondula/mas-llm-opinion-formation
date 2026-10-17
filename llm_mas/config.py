@@ -3,17 +3,22 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from .locations import input_path as locate_input, study_roots
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL = 'Qwen/Qwen2.5-1.5B-Instruct'
+
+
+def input_path(value):
+    return locate_input(value, ROOT)
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 def scenario(value):
-    path = Path(value)
+    path = input_path(value)
     if not path.is_file():
-        candidates=[ROOT/path,ROOT/'scenarios/controlled'/f'{value}.json',ROOT/'scenarios/custom'/f'{value}.json']
+        candidates=[path,input_path(Path('scenarios/controlled')/f'{value}.json'),input_path(Path('scenarios/custom')/f'{value}.json')]
         path=next((p for p in candidates if p.is_file()),candidates[1])
     data = json.loads(path.read_text())
     validate_scenario(data)
@@ -21,6 +26,9 @@ def scenario(value):
 
 def validate_scenario(data):
     if not isinstance(data,dict):raise ValueError('Scenario must be a JSON object')
+    from .tasks import is_question, validate_question
+    if is_question(data):
+        return validate_question(data)
     for field in ('id', 'title'):
         if not isinstance(data.get(field), str) or not data[field].strip():
             raise ValueError(f'Missing scenario {field}')
@@ -40,7 +48,36 @@ def validate_scenario(data):
     if data['strategy_1']['candidate'] == data['strategy_2']['candidate']:
         raise ValueError('Candidate statements must differ')
 
-def resolve(raw):
+def resolve(raw, planned=False):
+    if raw.get('dataset') or (raw.get('mode') == 'experiment' and 'scenarios' not in raw):
+        from .datasets import select
+        if raw.get('mode', 'experiment') not in ('experiment', 'preview', 'study'):
+            raise ValueError('StrategyQA uses the unified experiment protocol, not historical joint/exploration modes')
+        tasks, dataset, _ = select(ROOT, raw)
+        required = dict(decision_mode='generated',
+                        argument_mode='combined_reasoning', prompt_style='question', stopping='fixed')
+        for key, value in required.items():
+            if key in raw and raw[key] != value:
+                raise ValueError(f'StrategyQA requires {key}={value}')
+        if (raw.get('persona') or raw.get('preview_preset') == 'persona' or raw.get('paper_suite')
+                or raw.get('research') or raw.get('export_profile') or raw.get('joint_task_brief')
+                or raw.get('argument_source', 'own') != 'own' or raw.get('information_access', 'none') != 'none'):
+            raise ValueError('Historical personas, argument probes, joint tasks and exporters are not StrategyQA protocols')
+        raw = dict(raw, **required, dataset=dataset, tasks=tasks, scenarios=tasks,
+                   question_ids=[t['id'] for t in tasks], question_count=len(tasks))
+    if raw.get('mode') == 'scenario_exploration':
+        for key, expected in {'decision_mode':'generated','argument_mode':'combined_reasoning','prompt_style':'original','stopping':'fixed','decoding':'greedy','presentation_order':'strategy_1_first'}.items():
+            if key in raw and raw[key] != expected:
+                raise ValueError('Exploration fixes '+key+' to '+expected)
+        if any(raw.get(k) for k in ('joint_task_brief','observe_stopping','reverse_candidate_blocks','export_profile','paper_suite','sampling','conditions','research','grid','agent_counts','model_configurations')):
+            raise ValueError('Exploration does not accept closure, study, sampling or reversal options')
+        raw = dict(raw, decision_mode='generated', argument_mode='combined_reasoning', prompt_style='original', stopping='fixed', decoding='greedy', presentation_order='strategy_1_first')
+        raw.setdefault('max_argument_tokens', 256)
+        raw.setdefault('rounds', 5)
+        raw.setdefault('argument_source', 'own')
+        raw.setdefault('stance_diagnostic', False)
+        if raw['argument_source'] not in ('own','supplied') or type(raw['stance_diagnostic']) is not bool:
+            raise ValueError('Invalid exploration source or diagnostic setting')
     if raw.get('mode') == 'no_fixed_rounds':
         raw = dict(raw, mode='preview', stopping='sign_stability')
     if raw.get('preview_preset'):
@@ -48,7 +85,7 @@ def resolve(raw):
             raise ValueError('Unknown quick preview preset')
         raw = dict(raw, persona=raw['preview_preset'] == 'persona')
     if raw.get('mode') == 'experiment_c':
-        preset = json.loads((ROOT/'studies/experiment_C.json').read_text())
+        preset = json.loads(input_path('studies/experiment_C.json').read_text())
         # Use protocol defaults, but only expand factors explicitly requested.
         for key in ('grid', 'model_configurations', 'export_profile'):
             preset.pop(key, None)
@@ -61,13 +98,26 @@ def resolve(raw):
              initialization='natural', schedule='synchronous', argument_mode='predefined',
              max_argument_tokens=128, sentiment=True, device='auto', presentation_order='strategy_1_first')
     c.update(raw)
+    if c.get('output_layout') not in (None, 'experiment'):
+        raise ValueError('Unknown output layout')
+    if c.get('dataset'):
+        c.setdefault('message_similarity', True)
+        if type(c['message_similarity']) is not bool:
+            raise ValueError('message_similarity must be boolean')
+    c.setdefault('repetitions', 1)
+    c.setdefault('seed', 42)
+    c.setdefault('stopping', 'fixed')
+    if type(c['repetitions']) is not int or c['repetitions'] < 1:
+        raise ValueError('Repetitions must be a positive integer')
+    if type(c['seed']) is not int or not 0 <= c['seed'] <= 2**32 - 1:
+        raise ValueError('Seed must be an integer from 0 to 4294967295')
     if c['mode'] == 'joint_task':
         from .joint_task import DEFAULT_BRIEF
         c.setdefault('joint_task_brief', DEFAULT_BRIEF)
         if not isinstance(c['joint_task_brief'], str) or not c['joint_task_brief'].strip() or len(c['joint_task_brief']) > 3000:
             raise ValueError('Joint task brief must contain 1–3000 characters')
     c.setdefault('prompt_style', 'original')
-    if c['prompt_style'] not in ('original', 'open_discussion', 'topic_discussion', 'discussion_then_decision'):
+    if c['prompt_style'] not in ('original', 'open_discussion', 'topic_discussion', 'discussion_then_decision', 'question'):
         raise ValueError('Invalid prompt style')
     if c['prompt_style'] != 'original' and c['argument_mode'] != 'combined_reasoning':
         raise ValueError('Discussion prompt presets require combined_reasoning')
@@ -83,7 +133,7 @@ def resolve(raw):
         supplied = c.get('sampling') or {}
         if not isinstance(supplied, dict):
             raise ValueError('Sampling settings must be an object')
-        settings = dict(temperature=0.7, top_p=0.9, seed=42)
+        settings = dict(temperature=0.7, top_p=0.9, seed=c['seed'])
         settings.update({k:supplied[k] for k in settings if k in supplied})
         if method == 'temperature':settings['top_p']=1.0
         if method == 'top_p':settings['temperature']=1.0
@@ -101,7 +151,7 @@ def resolve(raw):
         c.pop('sampling', None)
     c['conditions'] = c.get('conditions') or []
     if c.pop('paper_suite', False):
-        paper=json.loads((ROOT/'studies/paper.json').read_text())
+        paper=json.loads(input_path('studies/paper.json').read_text())
         c['research']=paper['research']
         c['grid']=paper['grid']
         c['conditions']=[]
@@ -109,7 +159,7 @@ def resolve(raw):
         enriched=[]
         for value in c['scenarios']:
             name=Path(value).stem if isinstance(value,str) else ''
-            candidate=ROOT/'scenarios/study'/f'{name}.json'
+            candidate=input_path(Path('scenarios/study')/f'{name}.json')
             enriched.append(str(candidate) if name in ('sensor','storage') and candidate.exists() else value)
         c['scenarios']=enriched
     if c.get('stopping', 'fixed') not in ('fixed', 'exact_repetition', 'cosine_similarity', 'combined_stability', 'sign_stability', 'agent_closure'):
@@ -143,10 +193,12 @@ def resolve(raw):
         threshold = c['similarity_threshold']
         if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not math.isfinite(threshold) or not -1 <= threshold <= 1:
             raise ValueError('Similarity threshold must be between -1 and 1')
-    if c['mode'] not in ('preview', 'study', 'joint_task'): raise ValueError('Invalid mode')
-    if not isinstance(c['agents'], int) or c['agents'] < 2: raise ValueError('At least two agents required')
-    if not isinstance(c['rounds'], int) or c['rounds'] < 1: raise ValueError('Rounds must be positive')
-    if c['mode'] in ('preview', 'joint_task') and len(c['scenarios']) != 1:
+    if c['mode'] not in ('experiment', 'preview', 'study', 'joint_task', 'scenario_exploration'): raise ValueError('Invalid mode')
+    if type(c['agents']) is not int or c['agents'] < 1: raise ValueError('At least one agent required')
+    if type(c['rounds']) is not int or c['rounds'] < 0: raise ValueError('Update rounds must be nonnegative')
+    if c['rounds'] == 0 and c['stopping'] != 'fixed':
+        raise ValueError('Adaptive stopping requires at least one update round')
+    if c['mode'] in ('preview', 'joint_task', 'scenario_exploration') and len(c['scenarios']) != 1:
         raise ValueError('Preview requires one scenario')
     if len(c['models']) not in (1, c['agents']) or not all(isinstance(m, str) and m.strip() for m in c['models']):
         raise ValueError('Supply one model or one checkpoint per agent')
@@ -154,7 +206,7 @@ def resolve(raw):
         raise ValueError('Homogeneous mode requires a shared checkpoint')
     if c.get('agent_configuration') == 'heterogeneous' and len(c['models']) != c['agents']:
         raise ValueError('Per-agent mode requires one checkpoint selection per agent; repeated checkpoints are allowed')
-    if c['mode'] in ('preview', 'joint_task') and any(c.get(k) for k in ('grid','agent_counts','model_configurations')):
+    if c['mode'] in ('preview', 'joint_task', 'scenario_exploration') and any(c.get(k) for k in ('grid','agent_counts','model_configurations')):
         raise ValueError('Preview runs one conversation; sweeps require study mode')
     if c['schedule'] not in ('synchronous', 'sequential', 'reverse_sequential', 'no_peer'): raise ValueError('Invalid schedule')
     if c['argument_mode'] not in ('predefined', 'agent_selected', 'generated', 'conversational', 'combined_fixed', 'combined_reasoning'): raise ValueError('Invalid argument mode')
@@ -174,10 +226,10 @@ def resolve(raw):
     for record in records: validate_scenario(record)
     if not records or len({x['id'] for x in records}) != len(records): raise ValueError('Scenarios must be nonempty and have unique IDs')
     if set(c.get('research', [])) - {'validation', 'history', 'replay', 'prediction', 'mechanistic', 'heads', 'source_spans', 'continuation', 'sufficiency'}: raise ValueError('Unknown research module')
-    if c['mode'] in ('preview', 'joint_task') and (c.get('conditions') or c.get('research')): raise ValueError('Preview runs one conversation; conditions and research require study mode')
+    if c['mode'] in ('preview', 'joint_task', 'scenario_exploration') and (c.get('conditions') or c.get('research')): raise ValueError('Preview runs one conversation; conditions and research require study mode')
     for condition in c.get('conditions', []):
         if set(condition) - {'initialization','schedule','argument_mode','presentation_order','persona','decision_mode','stopping','observe_stopping','prompt_style'}: raise ValueError('Invalid condition fields')
-        resolve(dict(c, **condition, conditions=[]))
+        resolve(dict(c, **condition, conditions=[]),planned=True)
     if not isinstance(c.get('persona', False), bool):
         raise ValueError('Persona must be true or false')
     if c.get('persona'):
@@ -188,11 +240,49 @@ def resolve(raw):
                 if not all(isinstance(role.get(f), str) and role[f].strip() for f in ('role_name', 'priority')):
                     raise ValueError('Persona requires scenario role_name and priority for both strategies')
     c['scenarios'] = records
+    if c['mode'] == 'scenario_exploration':
+        c.setdefault('exploration_setup', 'standard')
+        if c['exploration_setup'] not in ('standard', 'deliberation'):
+            raise ValueError('Invalid exploration setup')
+        if c['exploration_setup'] == 'deliberation':
+            if c['argument_source'] != 'own' or c.get('information_access') not in ('shared', 'distributed'):
+                raise ValueError('Deliberation requires own arguments and shared or distributed evidence')
+            if any(s.get('scenario_family') != 'water_monitoring' for s in c['scenarios']):
+                raise ValueError('Deliberation requires a water monitoring family scenario')
+        c.setdefault('information_access', 'none')
+        c.setdefault('evidence_rotation', 0)
+        c.setdefault('persona_rotation', 0)
+        if c['information_access'] not in ('none', 'shared', 'distributed'):
+            raise ValueError('Invalid information access')
+        for key in ('evidence_rotation', 'persona_rotation'):
+            if type(c[key]) is not int or c[key] < 0:
+                raise ValueError(key+' must be a nonnegative integer')
+        if c['information_access'] != 'none':
+            if c['argument_source'] != 'own':
+                raise ValueError('Evidence conditions require own arguments to avoid leaking private evidence through argument lists')
+            for evidence_scenario in c['scenarios']:
+                cards = evidence_scenario.get('evidence_cards', [])
+                if not cards or any(not isinstance(card, dict) or not isinstance(card.get('id'), str) or not card['id'] or not isinstance(card.get('text'), str) or not card['text'].strip() for card in cards):
+                    raise ValueError('Select a scenario with valid evidence cards')
+                if len({card['id'] for card in cards}) != len(cards):
+                    raise ValueError('Evidence IDs must be unique')
+    if type(c.get('paired_control',False)) is not bool:raise ValueError('paired_control must be boolean')
+    if c.get('paired_control') and not planned:
+        if not c.get('dataset') or c['stopping']!='fixed' or len(c['conditions'])!=2 or {v.get('schedule') for v in c['conditions']}!={c['schedule'],'no_peer'} or c['schedule']=='no_peer':
+            raise ValueError('Paired controls require one peer branch and one no-peer branch with fixed horizon')
+    if c.get('pilot_protocol'):
+        from .pilot import PROTOCOL,validate
+        if c['pilot_protocol']!=PROTOCOL:raise ValueError('Unknown pilot protocol')
+        if not planned:validate(c)
     return c
 
 def run_path(name):
     if not re.fullmatch(r'[A-Za-z0-9_-]+', name): raise ValueError('Run ID must contain letters, digits, underscores or hyphens')
-    return ROOT / 'results' / 'studies' / name
+    experiment = ROOT / 'results/experiments' / name
+    if experiment.exists():
+        return experiment
+    active, archived = (parent / name for parent in study_roots(ROOT))
+    return archived if not active.exists() and archived.exists() else active
 
 
 def resolve_run_id(value=None):

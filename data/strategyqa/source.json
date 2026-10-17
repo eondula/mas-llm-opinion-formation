@@ -1,0 +1,30 @@
+{
+  "source_url": "https://storage.googleapis.com/ai2i/strategyqa/data/strategyqa_dataset.zip",
+  "downloaded_at": "2026-10-17T21:03:51.058976+00:00",
+  "release_sha256": "4911d85eb6721a93bed7645419df77e721808b32b9785dee14ad80e6249e0a90",
+  "files": {
+    "strategyqa_train.json": {
+      "count": 2290,
+      "labeled": 2290,
+      "sha256": "728e28b7d6bdfe6da3a0a5f8c5923113a79063d199e960cfcc9f8a3ab34cd92c"
+    },
+    "strategyqa_test.json": {
+      "count": 490,
+      "labeled": 0,
+      "sha256": "268bec2605a45830ae7f1f3861d5ee2a4a10f4aeaca0358a076760b2eff3ed25"
+    }
+  },
+  "discarded_fields": [
+    "term",
+    "description",
+    "facts",
+    "decomposition",
+    "evidence"
+  ],
+  "research_split": {
+    "test": 373,
+    "train": 1572,
+    "validation": 345
+  },
+  "release_verified": true
+}

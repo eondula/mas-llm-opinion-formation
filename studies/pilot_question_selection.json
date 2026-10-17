@@ -1,0 +1,50 @@
+{
+  "kind": "pilot_question_selection",
+  "status": "prepared_selection_only_not_a_run_configuration",
+  "source": {
+    "name": "strategyqa",
+    "path": "data/strategyqa",
+    "partition": "train",
+    "source_url": "https://storage.googleapis.com/ai2i/strategyqa/data/strategyqa_dataset.zip",
+    "release_sha256": "4911d85eb6721a93bed7645419df77e721808b32b9785dee14ad80e6249e0a90",
+    "source_sha256": "728e28b7d6bdfe6da3a0a5f8c5923113a79063d199e960cfcc9f8a3ab34cd92c",
+    "release_verified": true,
+    "split_version": "normalized-question-sha256-70-15-15-v1"
+  },
+  "research_split": "train",
+  "split_seed": 42,
+  "selection_seed": 42,
+  "selection_version": "pilot-label-stratified-sha256-v1",
+  "algorithm": "Within each evaluator-only label stratum, choose five eligible IDs ranked by SHA256(version + newline + seed + newline + qid). Order the ten chosen IDs by SHA256(version + newline + order + newline + seed + newline + qid). All strings use UTF-8.",
+  "exclusion_rule": "Exclude question IDs from completed active StrategyQA runs at preparation time; exclusion IDs are frozen below.",
+  "excluded_question_ids": [
+    "315575d5cbdd1d154744",
+    "3413c919d24c59eadde3",
+    "646d3503f3a3939e2e63",
+    "7419826e4373eb1e83ff",
+    "82bde29394d6aba258a1",
+    "a905e30e6cfc76377348",
+    "b77d2efee37741e44c32",
+    "b8677742616fef051f00",
+    "d4d98ff0a195302735a5"
+  ],
+  "counts": {
+    "questions": 10,
+    "yes": 5,
+    "no": 5
+  },
+  "question_ids": [
+    "d8262444ec05bdbe1094",
+    "70e7c1ad517f7f78d21d",
+    "7870b1cef39a4f685911",
+    "b5fbec7f7dd187a2746e",
+    "f66cf3ddea2d87e8e572",
+    "14806a45b707fc56e4dd",
+    "5170cfed313d2de67942",
+    "cdd68b5d76364d35779f",
+    "71d5af08c0cfb9565a54",
+    "7c5daad08c46d9410a81"
+  ],
+  "selected_ids_sha256": "741c90cb825a4f3eeb9a38322f960e3a83c06762f53b61bb5cbe5c71e01e9c78",
+  "label_use": "Labels used only by selection/evaluation; no per-question answer, fact or evidence is included in this manifest or agent-visible tasks."
+}

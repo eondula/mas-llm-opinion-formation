@@ -7,7 +7,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-from .runner import write
+from .storage import write
 
 
 

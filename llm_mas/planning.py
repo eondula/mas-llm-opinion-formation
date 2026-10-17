@@ -17,10 +17,23 @@ def conditions(config):
 def configurations(config):
     models=config.get('model_configurations') or [config['models']]
     groups=config.get('agent_counts') or [config['agents']]
+    if any(type(n) is not int or n < 1 for n in groups):
+        raise ValueError('Agent counts must be positive integers')
+    if any(not assignment or not all(isinstance(m, str) and m.strip() for m in assignment)
+           or not any(len(assignment) in (1, n) for n in groups) for assignment in models):
+        raise ValueError('Each model assignment must match at least one requested agent count')
+    if any(not any(len(assignment) in (1, n) for assignment in models) for n in groups):
+        raise ValueError('Each requested agent count must have a compatible model assignment')
     for n in groups:
         for assignment in models:
             if len(assignment) not in (1,n):continue
             for condition in conditions(config):
                 starts=list(product((1,2),repeat=n)) if condition.get('initialization')=='all_forced' else [condition.get('initialization',config['initialization'])]
                 for start in starts:
-                    yield dict(config,**dict(condition,agents=n,models=assignment,initialization=list(start) if isinstance(start,tuple) else start),conditions=[],grid={},model_configurations=[],agent_counts=[])
+                    active = dict(config, **dict(condition, agents=n, models=assignment,
+                                  initialization=list(start) if isinstance(start, tuple) else start),
+                                  conditions=[], grid={}, model_configurations=[], agent_counts=[])
+                    # Disjoint round/agent/question streams within each repeated condition.
+                    stride = (active['rounds'] + 1) * n * len(active['scenarios'])
+                    for repetition in range(config.get('repetitions', 1)):
+                        yield dict(active, repetition=repetition, seed_offset=repetition * stride)

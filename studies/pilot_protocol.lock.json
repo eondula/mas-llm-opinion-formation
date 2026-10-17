@@ -1,0 +1,172 @@
+{
+  "protocol_hash": "a787324c773f090866e3c41c76fa7a9b274e01f5c6027ac9eaf6416a9ec77650",
+  "descriptor": {
+    "protocol": "strategyqa-pilot-v1",
+    "settings": {
+      "agent_configuration": "heterogeneous",
+      "mode": "experiment",
+      "models": [
+        "Qwen/Qwen2.5-1.5B-Instruct",
+        "Qwen/Qwen2.5-1.5B-Instruct"
+      ],
+      "agents": 2,
+      "model_configurations": [
+        [
+          "Qwen/Qwen2.5-1.5B-Instruct",
+          "Qwen/Qwen2.5-1.5B-Instruct"
+        ],
+        [
+          "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+          "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+        ],
+        [
+          "Qwen/Qwen2.5-1.5B-Instruct",
+          "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+        ],
+        [
+          "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+          "Qwen/Qwen2.5-1.5B-Instruct"
+        ]
+      ],
+      "model_revisions": {
+        "Qwen/Qwen2.5-1.5B-Instruct": {
+          "model": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+          "tokenizer": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
+        },
+        "HuggingFaceTB/SmolLM2-1.7B-Instruct": {
+          "model": "31b70e2e869a7173562077fd711b654946d38674",
+          "tokenizer": "31b70e2e869a7173562077fd711b654946d38674"
+        }
+      },
+      "expected_dtype": "torch.bfloat16",
+      "dataset": {
+        "name": "strategyqa",
+        "path": "data/strategyqa",
+        "partition": "train",
+        "source_url": "https://storage.googleapis.com/ai2i/strategyqa/data/strategyqa_dataset.zip",
+        "release_sha256": "4911d85eb6721a93bed7645419df77e721808b32b9785dee14ad80e6249e0a90",
+        "source_sha256": "728e28b7d6bdfe6da3a0a5f8c5923113a79063d199e960cfcc9f8a3ab34cd92c",
+        "release_verified": true,
+        "split_version": "normalized-question-sha256-70-15-15-v1",
+        "split": "train",
+        "split_seed": 42
+      },
+      "question_ids": [
+        "d8262444ec05bdbe1094",
+        "70e7c1ad517f7f78d21d",
+        "7870b1cef39a4f685911",
+        "b5fbec7f7dd187a2746e",
+        "f66cf3ddea2d87e8e572",
+        "14806a45b707fc56e4dd",
+        "5170cfed313d2de67942",
+        "cdd68b5d76364d35779f",
+        "71d5af08c0cfb9565a54",
+        "7c5daad08c46d9410a81"
+      ],
+      "question_count": 10,
+      "question_balance": "equal",
+      "question_seed": 42,
+      "initialization": "natural",
+      "rounds": 5,
+      "repetitions": 3,
+      "schedule": "synchronous",
+      "conditions": [
+        {
+          "schedule": "synchronous"
+        },
+        {
+          "schedule": "no_peer"
+        }
+      ],
+      "paired_control": true,
+      "decoding": "fixed_sampling",
+      "sampling_method": "combined",
+      "sampling": {
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "seed": 42,
+        "top_k": 0
+      },
+      "seed": 42,
+      "max_argument_tokens": 256,
+      "device": "mps",
+      "sentiment": true,
+      "message_similarity": true,
+      "stopping": "fixed",
+      "pilot_protocol": "strategyqa-pilot-v1",
+      "stance_audit": true
+    },
+    "prompts": {
+      "qa_system": "Consider the Yes/No question and share your answer and reasoning.\n",
+      "qa_initial": "Question: {question}\n\nThe possible answers are Yes and No.\n",
+      "qa_response": "{turn_instruction}\n\nReturn your reply as a JSON object with these fields:\n{{\"answer\": \"Yes or No\", \"explanation\": \"your reasoning and response\"}}\n",
+      "qa_probe": "Assess your current answer to the original question using your reasoning and the discussion so far.\n\nReturn exactly one of the following answers, with no explanation or other text:\n{candidate_1}\n{candidate_2}\n",
+      "qa_peer_message": "{speaker} answered:\n{message}\n"
+    },
+    "source_sha256": {
+      "llm_mas/__init__.py": "58e2e26882baa94688bdad82c8a5f653e6e5f174e7b763c792694b3a29b3e504",
+      "llm_mas/__main__.py": "ec6cd7624567647f7e3a79894edac04431a2508e1d87de729020dd16b928fc7a",
+      "llm_mas/behavioral.py": "20edb98070a33f8ecc88c5bf6cd25e4430b4bbabea7289ecdceb7a53d54b27ca",
+      "llm_mas/behavioral_reports.py": "8de2ee9fb5c0ba0b39262aadc9d80142f8841ab4853718febd466836c971bdf1",
+      "llm_mas/choice_output.py": "0b6974082b0a822f6e35849f6e5823208d2a6de567915f06d163d6909b596fe8",
+      "llm_mas/closure.py": "4674c4d4491948861e3a479daec4dce219ab78ca69e64d2e65d3759e4dceb16a",
+      "llm_mas/config.py": "4822b04991203cba650a02e1a2dbdff6a765330430a3ca5d9c2fc6297007f609",
+      "llm_mas/continuation.py": "e0e872911e95df1143344885c05efe394dddcdfd5c795caf286de0c8ea6844eb",
+      "llm_mas/datasets.py": "5a95d22ff8af8f44956c6828f1474d49f52a801c2e004e486a340284fd9708a5",
+      "llm_mas/engine.py": "ddb630f40f9c6e9a3aaa66070b772826e93c749045b12968bdc437327912a475",
+      "llm_mas/evaluation.py": "82e8efcc0e9aa1a3758290168a1b6ab126d8aa8062c6641dddf978a5d8f4a3ac",
+      "llm_mas/experiment_c.py": "8c513ffe6f703b046d59a535befdaa17c9176e34513bfd7a40ba82647a2d8900",
+      "llm_mas/experiment_c_analysis.py": "11eedf3a293099c39214f9528f3c77367c07cdb23a2c0780c1244a6d7a0a9ab0",
+      "llm_mas/experiment_d.py": "abb8080a8521c2128fa88f6e6d18bfa8debf84ddf06cd6390ca8530c87534d17",
+      "llm_mas/exploration.py": "4a02aada7e9825132cd6d2e878af4e3048c83aa9df9b1f53c41b00c968fff309",
+      "llm_mas/exploration_analysis.py": "4a5e3a11b1d89ce58939898c6dffa086cc6183da1f7f24776e558ac8df1b05bd",
+      "llm_mas/figures.py": "cf139ae8786e85e00f593a5adb9067eed650af809cff9515ed013d0d22a593e7",
+      "llm_mas/full_study_analysis.py": "a341e33dc9da9686061c67f6b73c3e0f6a988c22b79a94ad854fa644c6eabc87",
+      "llm_mas/full_study_compare.py": "f34de10ba777673be19d0f819d07a5a0ba14e0dc6ac7fdae29b062e8079fab61",
+      "llm_mas/full_study_controls.py": "7ae1d3d2815f68eb4032ce4da210a13369c1f0aaaec47a263a2a9b7d31ccde95",
+      "llm_mas/interventions.py": "a82ca653a27bd725090c36302bb75c17f4d9d48c2ef633d8efa23cb95fe2045b",
+      "llm_mas/joint_task.py": "0cabdb1176ed43af6a91bb201b66b3d856038e713e25be9930206192757431d5",
+      "llm_mas/locations.py": "4a489e5d5d34764bd9b4e5d041cc109091e010825deb299f4e2557eff68c62ce",
+      "llm_mas/measurement.py": "4b54ad35bcb669342e4d28db1e90dde23bf3377b7e5c50d7d9a6d9cf2b88075d",
+      "llm_mas/message_analysis.py": "73f3a2fb2d161cf84ac272673512cd093207d875567fc2b161841bda7b5ed411",
+      "llm_mas/message_similarity.py": "8e0920a36a79d57335b8a9b80f336624e67b2268af726a2ee468b5e55a71785e",
+      "llm_mas/pilot.py": "7ddf1a09cc52c0dae38bc8d36235523acfdcca359627b064d045b947d7942508",
+      "llm_mas/pilot_analysis.py": "760655bd5ac979633bfb8e5b45ef41c08f9683e06e977a5e301f4ad849c73ecc",
+      "llm_mas/planning.py": "bd09f25679e7b84d6c27e92bde2a1b42c36c6f89261bdcbfc3dd01a451f098c9",
+      "llm_mas/plot_data.py": "662b52d4116ecedacb277775d3aace556fc74b826b5104cc4bbda86a6250b4f9",
+      "llm_mas/prediction.py": "732e81df99aaf5c4a4d76aac945a3a45bf3220a312aa60da7e732a37baf0296c",
+      "llm_mas/progress.py": "937175a09f764e1928c9a97b7d0ab4a315d7748f9f54b8b6d4d2aca3456e1e5d",
+      "llm_mas/prompts.py": "e470ad492eb4d1b51eaeca02381fb9d05385fa9a93dcf4cb48f4d3ebe2a6d006",
+      "llm_mas/provenance.py": "dbe4f286944fa9e301cffe9b80b92f2fb2aa40bfa9120b3ea704b6d020019048",
+      "llm_mas/question_policy.py": "f5363cf15ed1b126748cc8917bdd8c09c61bbfae1b1c29d5c59894a97c22b16d",
+      "llm_mas/reporting.py": "c0b5c8fb0a9931731bcff22d1994ad4060e09e6f380c32b72e9e31127388eeed",
+      "llm_mas/research.py": "b849c3477f37558ea37b918c5a3537d1e856d14cc242dc7dbd8753a2a99d2b01",
+      "llm_mas/response_policy.py": "bf8eb3b99348f76b8a3dd290e255b0d1e2481909a92aa31faae01b77b5583fd6",
+      "llm_mas/runner.py": "2e0479de333984791a1ed5e304b81492fba5edf643a68f3df623f62619ae8e59",
+      "llm_mas/runtime.py": "6a15934e55d8efe0bf2150cdd2d15e33716456ab41147863b6c117a3d7c022ef",
+      "llm_mas/saved_analysis.py": "b01c77e63e94b703715520b4ae6a579faad11f44cc7122e6efc54e841c939e3b",
+      "llm_mas/sentiment.py": "5b103ed30e804c3b7cc2fdb9531bb759acbb4da31ce1b26303afe03a9970ecf3",
+      "llm_mas/stance_audit.py": "18a0baeca007f22ebcb653b9c9eccaefa8036f5a36c5f584974fc6382bcd45e6",
+      "llm_mas/storage.py": "cc5750283adeea845d414cceb56d888ce8d60f414ca571716f60751f858217c7",
+      "llm_mas/tables.py": "5d59490d2722c98f7b6f7f3650b1e26a9f52bd24bf27346d743823aba7dbcec4",
+      "llm_mas/tasks.py": "a98b703440074a3d6a2bd21a2595e78ad0ec9a6ccd23cbb7daa0a13b8509eef7",
+      "llm_mas/trajectories.py": "02d84bc381bb1179eec24c4152e8b70e6eef76fee5b90c9f9c85a16b6907c897",
+      "llm_mas/validate_d.py": "86d684f9de8a87a9663abf819ce342887d11353368edbd2d030ce92ff300dc34",
+      "llm_mas/validation.py": "a2362bc4a5889a7f41a73c84a6e0023dde5782b08fa1b18d5e8e1b6cfb9b2162",
+      "llm_mas/web.py": "8cf3fdadbb64abe36fad7f21f7979aa2db8cd211139e89ac5eb952f2e0dd343d"
+    },
+    "selection_sha256": "998f7bc8dc08096493251c4808c131a20b628e0759667d6599db1fc0309c2f13",
+    "packages": {
+      "torch": "2.14.0",
+      "transformers": "5.16.1",
+      "numpy": "2.5.2",
+      "matplotlib": "3.11.1"
+    },
+    "scorer": "candidate-log-likelihood-v1",
+    "measurement_stages": [
+      "before_peer_delivery",
+      "after_peer_delivery",
+      "after_public_response"
+    ]
+  }
+}

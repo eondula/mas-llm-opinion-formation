@@ -1,0 +1,28 @@
+{
+  "mode": "experiment",
+  "models": [
+    "Qwen/Qwen2.5-1.5B-Instruct"
+  ],
+  "agents": 2,
+  "rounds": 3,
+  "repetitions": 1,
+  "initialization": "natural",
+  "schedule": "synchronous",
+  "stopping": "fixed",
+  "decoding": "greedy",
+  "seed": 42,
+  "sentiment": true,
+  "max_argument_tokens": 256,
+  "research": [],
+  "dataset": {
+    "name": "strategyqa",
+    "path": "data/strategyqa",
+    "partition": "train",
+    "split": "train",
+    "split_seed": 42
+  },
+  "question_count": 1,
+  "question_seed": 42,
+  "output_layout": "experiment",
+  "message_similarity": true
+}

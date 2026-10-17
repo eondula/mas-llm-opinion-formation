@@ -1,10 +1,30 @@
 const $=id=>document.getElementById(id);let catalog=[],events=[],lastIndex=0;
 async function api(path,data){const r=await fetch('/api/'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{});const v=await r.json();if(!r.ok)throw Error(v.error);return v;}
-function config(){return {joint_task_brief:$('mode').value==='joint_task'?$('joint-task-brief').value.trim():undefined,stopping:$('mode').value==='joint_task'?$('joint-stopping').value:undefined,prompt_style:$('prompt-style').value,decision_mode:$('decision-mode').value,sampling_method:$('sampling-method').value,sampling:{temperature:Number($('temperature').value),top_p:Number($('top-p').value),seed:Number($('sampling-seed').value)},decoding:$('mode').value!=='study'?$('decoding').value:'greedy',preview_preset:$('mode').value!=='study'?$('preview-preset').value:undefined,paper_suite:$('mode').value==='study'&&$('paper-suite').checked,run_id:$('run-id').value.trim()||undefined,mode:$('mode').value,agents:Number($('agents').value),agent_configuration:$('agent-configuration').value,models:$('models').value.split('\n').map(s=>s.trim()).filter(Boolean),scenarios:[...$('scenarios').selectedOptions].map(o=>o.value),rounds:Number($('rounds').value),initialization:$('initialization').value==='natural'?'natural':[...$('forced-strategies').querySelectorAll('select')].map(el=>Number(el.value)),schedule:$('schedule').value,argument_mode:$('argument_mode').value,max_argument_tokens:Number($('max_argument_tokens').value),research:$('mode').value==='study'?[...document.querySelectorAll('[name=research]:checked')].map(x=>x.value):[],conditions:$('mode').value==='study'&&$('conditions').value.trim()?JSON.parse($('conditions').value):[]};}
-async function load(){catalog=await api('scenarios');$('scenarios').replaceChildren();for(const e of catalog){const name=e.path.split('/').pop().replace(/\.json$/,'').replace(/_/g,' ');const label=name.charAt(0).toUpperCase()+name.slice(1);const o=new Option(label,e.path);o.title=e.data.title;o.selected=e.path.endsWith('/storage.json')||($('mode').value==='study'&&e.path.endsWith('/sensor.json'));$('scenarios').add(o);}}
+function config(){
+ if($('mode').value==='experiment' && $('dataset-partition'))return {
+  mode:'experiment',dataset:{name:'strategyqa',partition:$('dataset-partition').value,split:$('dataset-split').value,split_seed:Number($('split-seed').value)},
+  question_ids:[...$('scenarios').selectedOptions].map(o=>o.value),question_count:Number($('question-count').value),question_seed:Number($('question-seed').value),
+  models:$('models').value.split('\n').map(s=>s.trim()).filter(Boolean),agents:Number($('agents').value),agent_configuration:$('agent-configuration').value,
+  rounds:Number($('rounds').value),repetitions:Number($('repetitions').value),schedule:$('schedule').value,initialization:$('initialization').value==='natural'?'natural':[...$('forced-strategies').querySelectorAll('select')].map(el=>Number(el.value)),
+  decoding:$('decoding').value,sampling_method:$('sampling-method').value,
+  sampling:{temperature:Number($('temperature').value),top_p:Number($('top-p').value),seed:Number($('sampling-seed').value)},
+  seed:Number($('sampling-seed').value),max_argument_tokens:Number($('max_argument_tokens').value),run_id:$('run-id').value.trim()||undefined
+ };
+ return {repetitions:Number($('repetitions')?.value||1),seed:Number($('sampling-seed')?.value||42),joint_task_brief:$('mode').value==='joint_task'?$('joint-task-brief').value.trim():undefined,stopping:$('mode').value==='joint_task'?$('joint-stopping').value:undefined,prompt_style:$('prompt-style').value,decision_mode:$('decision-mode').value,sampling_method:$('sampling-method').value,sampling:{temperature:Number($('temperature').value),top_p:Number($('top-p').value),seed:Number($('sampling-seed').value)},decoding:$('mode').value!=='study'?$('decoding').value:'greedy',preview_preset:$('mode').value!=='study'?$('preview-preset').value:undefined,paper_suite:$('mode').value==='study'&&$('paper-suite').checked,run_id:$('run-id').value.trim()||undefined,mode:$('mode').value,agents:Number($('agents').value),agent_configuration:$('agent-configuration').value,models:$('models').value.split('\n').map(s=>s.trim()).filter(Boolean),scenarios:[...$('scenarios').selectedOptions].map(o=>o.value),rounds:Number($('rounds').value),initialization:$('initialization').value==='natural'?'natural':[...$('forced-strategies').querySelectorAll('select')].map(el=>Number(el.value)),schedule:$('schedule').value,argument_mode:$('argument_mode').value,max_argument_tokens:Number($('max_argument_tokens').value),research:['experiment','study'].includes($('mode').value)?[...document.querySelectorAll('[name=research]:checked')].map(x=>x.value):[],conditions:['experiment','study'].includes($('mode').value)&&$('conditions').value.trim()?JSON.parse($('conditions').value):[]};}
+async function load(){
+ if($('mode').value==='experiment' && $('dataset-partition')){
+  const result=await api('questions?partition='+$('dataset-partition').value+'&split='+$('dataset-split').value+'&split_seed='+encodeURIComponent($('split-seed').value));
+  catalog=result.questions.map(q=>({path:q.id,data:{kind:'binary_question',id:q.id,title:q.question,question:q.question}}));
+  $('scenarios').replaceChildren(...catalog.map(e=>new Option(e.data.question+' · '+e.path,e.path)));
+  $('dataset-help').textContent=`${catalog.length} questions in this split. Leave selection empty to sample the configured count. `+(result.labeled?'Labels are used after simulation only.':'Public labels are unavailable; correctness will remain unscored.');
+  return;
+ }
+ catalog=await api('scenarios?archived=1');$('scenarios').replaceChildren();
+ for(const e of catalog){const o=new Option(e.data.title,e.path);o.selected=e.path.endsWith('/storage.json');$('scenarios').add(o);}
+}
 function safe(fn){return async()=>{try{$('error').textContent='';await fn();}catch(e){$('error').textContent=e.message;}};}
-$('mode').onchange=()=>{$('agents').disabled=false;$('scenarios').multiple=$('mode').value==='study';safe(load)();};$('mode').onchange();
-function startingControls(){const box=$('forced-strategies'),previous=[...box.querySelectorAll('select')].map(el=>el.value);box.hidden=$('initialization').value!=='forced';box.replaceChildren();for(let i=0;i<Number($('agents').value);i++){const label=document.createElement('label');label.textContent=i<26?`Agent ${String.fromCharCode(65+i)}`:`Agent ${i+1}`;const select=document.createElement('select');select.id='forced-'+i;label.htmlFor=select.id;select.add(new Option('Strategy 1','1'));select.add(new Option('Strategy 2','2'));select.value=previous[i]||(i===0?'2':'1');box.append(label,select);}}
+$('mode').onchange=()=>{$('agents').disabled=false;$('scenarios').multiple=['experiment','study'].includes($('mode').value);safe(load)();};$('mode').onchange();
+function startingControls(){const box=$('forced-strategies'),previous=[...box.querySelectorAll('select')].map(el=>el.value);box.hidden=$('initialization').value!=='forced';box.replaceChildren();for(let i=0;i<Number($('agents').value);i++){const label=document.createElement('label');label.textContent=i<26?`Agent ${String.fromCharCode(65+i)}`:`Agent ${i+1}`;const select=document.createElement('select');select.id='forced-'+i;label.htmlFor=select.id;select.add(new Option('Yes','1'));select.add(new Option('No','2'));select.value=previous[i]||(i===0?'2':'1');box.append(label,select);}}
 $('initialization').onchange=startingControls;$('agents').onchange=()=>{startingControls();modelControls();draw(lastIndex);};const modeChange=$('mode').onchange;$('mode').onchange=()=>{modeChange();startingControls();};startingControls();
 $('preview-prompts').onclick=safe(async()=>{const dialog=$('prompt-dialog');$('prompt').textContent='Loading configuration and prompts…';dialog.showModal();try{const result=await api('preview',config());$('prompt').textContent=JSON.stringify(result,null,2);}catch(error){$('prompt').textContent=error.message;throw error;}});
 $('run').onclick=safe(async()=>{
@@ -55,10 +75,11 @@ function updateHeading(){
  const scenario=activeConfig?.scenarios?.[scenarioIndex];
  const settings=activeTasks[conditionIndex]||{...activeConfig,...activeConfig?.conditions?.[conditionIndex]};
  $('title').textContent=scenario?scenarioLabel(scenario):'Scenario details';
+ if(settings.dataset){$('description').textContent=`StrategyQA · ${settings.dataset.partition} / ${settings.dataset.split} · ${({synchronous:'Synchronous deliberation',sequential:'Sequential deliberation · forward',reverse_sequential:'Sequential deliberation · reverse',no_peer:'Independent reasoning'}[settings.schedule]||settings.schedule)} · repetition ${(settings.repetition||0)+1}`;return;}
  $('description').textContent=[settings.decision_mode==='generated'?'Generated choice':'Scored choice',settings.schedule?.replaceAll('_',' '),settings.initialization==='natural'?'Natural start':settings.initialization?'Forced start':null,settings.argument_mode?({predefined:'Predefined (cyclic)',agent_selected:'Conversational (fixed list)',combined_reasoning:'Combined prompt (flexible reasoning)',combined_fixed:'Combined prompt (fixed list)',generated:'Generated',conversational:'Conversational (generated)'}[settings.argument_mode]||settings.argument_mode)+' arguments':null].filter(Boolean).join(' · ');
 }
 // Shared identity colors for faces, messages, plot traces, and legends.
-function agentColor(index){return `var(--plot-${index%4+1})`;}
+function agentColor(index){return `hsl(${(25+360*index/Math.max(2,names.length))%360} 58% 48%)`;}
 const bubbleFrames=new Map();
 function draw(index){
  updateHeading();
@@ -68,9 +89,13 @@ function draw(index){
  const taskIndex=Number((current||'0').split('_')[0]);
  const settings=activeTasks[taskIndex]||activeConfig;
  const n=settings?.agents||Number($('agents').value);
+ const questionRun=settings?Boolean(settings.dataset):$('mode').value==='experiment';
+ if($('stance-scale'))$('stance-scale').textContent=questionRun?'After own response · No −1 → Yes +1':'After own response · S2 −1 → S1 +1';
+ if($('positive-choice-label'))$('positive-choice-label').textContent=questionRun?'Yes':'S1';
+ if($('negative-choice-label'))$('negative-choice-label').textContent=questionRun?'No':'S2';
  names.splice(0,names.length,...Array.from({length:n},(_,i)=>i<26?`Agent ${String.fromCharCode(65+i)}`:`Agent ${i+1}`));
  const visible=responseFrame(events,index,current,settings||{agents:n,schedule:$('schedule').value});
- const arena=$('arena');arena.querySelectorAll('.agent').forEach(e=>e.remove());arena.classList.toggle('many-agents',n>2);arena.style.setProperty('--agent-scale',Number($('size').value)/100);
+ const arena=$('arena');arena.querySelectorAll('.agent').forEach(e=>e.remove());arena.classList.toggle('many-agents',n>2);arena.classList.toggle('single-agent',n===1);arena.style.setProperty('--agent-scale',Number($('size').value)/100);
  if(n>2)arena.style.minHeight=Math.max(850,n*110)+'px';else arena.style.minHeight='';
  names.forEach((name,i)=>{const row=seen[name],node=agentTemplate.cloneNode(true);node.id='study-agent-'+i;node.style.setProperty('--agent-color',agentColor(i));node.style.setProperty('--motion-delay',`${-i*.7}s`);node.className='agent '+(i%2?'right':'left');
  if(n>2){const angle=2*Math.PI*i/n-Math.PI/2;node.style.left=(50+33*Math.cos(angle))+'%';node.style.top=(50+34*Math.sin(angle))+'%';}
@@ -84,8 +109,8 @@ function draw(index){
  bubble.classList.toggle('response-pop',Boolean(shown)&&bubbleFrames.get(name)!==frame);
  bubbleFrames.set(name,frame);
  node.querySelector('.bubble').classList.toggle('has-response',Boolean(shown));node.querySelector('.circle').className='circle '+(row?.strategy!=null?'s'+row.strategy:'unknown');
- node.querySelector('.strategy-label').textContent=row?(row.strategy==null?'Invalid generated choice':'Strategy '+row.strategy):'No strategy yet';node.querySelector('.forced').textContent=row?.forced?'Forced start':row?(row.choice_status==='valid'?'Generated choice':row.strategy==null?'':settings?.decision_mode==='generated'?'Generated choice':'Stance-derived choice'):'';
- node.querySelector('.activity').textContent=row?`Round ${row.round} · stance ${fmt(row.post.stance)}`:'Waiting';node.querySelector('.message').title=row?.model||'';
+ node.querySelector('.strategy-label').textContent=row?(row.answer??(row.strategy==null?'Invalid generated choice':'Strategy '+row.strategy)):'No answer yet';node.querySelector('.forced').textContent=row?.forced?'Forced start':row?(row.choice_status==='valid'?'Generated choice':row.strategy==null?'':settings?.decision_mode==='generated'?'Generated choice':'Stance-derived choice'):'';
+ node.querySelector('.activity').textContent=row?`Round ${row.round} · stance ${fmt(row.post.stance)} · margin ${fmt(row.post.margin)}${typeof row.correct==='boolean'?(row.correct?' · correct':' · incorrect'):''}`:'Waiting';node.querySelector('.message').title=row?.model||'';
  if(n===2&&i===0)arena.insertBefore(node,arena.querySelector('.exchange'));else arena.append(node);
  });
  drawJointSheet(subset,settings,n,current);
@@ -163,7 +188,7 @@ $('follow').onclick=()=>{following=true;$('follow').textContent='Following live'
 $('condition').onchange=()=>{selectedTask=$('condition').value;following=false;lastIndex=events.map(e=>e.task).lastIndexOf(selectedTask);draw(lastIndex);};
 $('play').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('play').textContent='Play responses';return;}following=false;const indices=events.map((e,i)=>e.task===selectedTask?i:-1).filter(i=>i>=0);let at=0;timer=setInterval(()=>{if(at>=indices.length){clearInterval(timer);timer=null;$('play').textContent='Play responses';return;}lastIndex=indices[at++];$('checkpoint').value=lastIndex;draw(lastIndex);},Number($('playback-speed').value));$('play').textContent='Pause';};
 let polling=false;
-async function poll(){if(polling)return;polling=true;try{const d=await api('status'+($('saved-run').value?'?run_id='+encodeURIComponent($('saved-run').value):''));activeConfig=d.config;activeTasks=d.tasks||[];renderClosureLog(d.closure_events||[]);$('zip-download').hidden=!d.run_id;$('zip-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/paper_outputs.zip';$('figure-download').hidden=!d.run_id;$('figure-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/figures/index.html';updateHeading();$('connection').textContent='Connected';$('run-state').textContent=d.status.phase+(d.status.termination?.reason ? ' · '+(({system_detected_stability:'System-detected stability',system_detected_repetition:'System-detected repetition',agents_accepted_closure:'Agents accepted closure',budget_exhausted:'Round budget exhausted',max_rounds:'Maximum rounds reached',all_agents_finished:'All agents finished (legacy)'})[d.status.termination.reason]||d.status.termination.reason)+' (round '+d.status.termination.round+')':'');$('progress').textContent=`${d.status.completed||0} / ${d.status.total||0}`;$('study-progress').max=d.status.total||1;$('study-progress').value=d.status.completed||0;$('timing').textContent=`Elapsed ${Math.round(d.status.elapsed_seconds||0)}s · ETA ${d.status.estimated_remaining_seconds==null?'estimating':Math.round(d.status.estimated_remaining_seconds)+'s'}`;$('run').disabled=d.running;$('stop').disabled=!d.can_stop;
+async function poll(){if(polling)return;polling=true;try{const d=await api('status?scope=main'+($('saved-run').value?'&run_id='+encodeURIComponent($('saved-run').value):''));activeConfig=d.config;activeTasks=d.tasks||[];renderClosureLog(d.closure_events||[]);$('zip-download').hidden=!d.run_id;$('zip-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/paper_outputs.zip';$('figure-download').hidden=!d.run_id;$('figure-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/figures/index.html';$('full-report').hidden=!d.report_available;$('full-report').href='/results/'+encodeURIComponent(d.run_id||'')+'/index.html';updateHeading();$('connection').textContent='Connected';if($('evaluation-summary'))$('evaluation-summary').textContent=d.evaluation?(d.evaluation.accuracy==null?'Correctness unavailable: no public labels.':`Response accuracy: ${(100*d.evaluation.accuracy).toFixed(1)}% · invalid outputs: ${d.evaluation.invalid_responses}`):'';$('run-state').textContent=d.status.phase+(d.status.termination?.reason ? ' · '+(({system_detected_stability:'System-detected stability',system_detected_repetition:'System-detected repetition',agents_accepted_closure:'Agents accepted closure',budget_exhausted:'Round budget exhausted',max_rounds:'Maximum rounds reached',all_agents_finished:'All agents finished (legacy)'})[d.status.termination.reason]||d.status.termination.reason)+' (round '+d.status.termination.round+')':'');$('progress').textContent=`${d.status.completed||0} / ${d.status.total||0}`;$('study-progress').max=d.status.total||1;$('study-progress').value=d.status.completed||0;$('timing').textContent=`Elapsed ${Math.round(d.status.elapsed_seconds||0)}s · ETA ${d.status.estimated_remaining_seconds==null?'estimating':Math.round(d.status.estimated_remaining_seconds)+'s'}`;$('run').disabled=d.running||d.worker_busy;$('stop').disabled=!d.can_stop;
  if(d.running && !d.events.length) {
   $('title').textContent='Preparing the conversation…';
   $('description').textContent=d.status.log_tail?.trim().split(/\r?\n/).filter(Boolean).at(-1)||('Loading '+(d.status.model||'model')+' · first response pending');
@@ -185,11 +210,11 @@ function chart(container, trajectories, caption) {
 
 async function refreshRuns(){
  try {
-  const [runs,active]=await Promise.all([api('runs'),api('active-runs')]);
+  const [runs,active,archived]=await Promise.all([api('runs?scope=main'),api('active-runs?scope=main'),api('runs?scope=main&archive=only')]);
   const select=$('saved-run'),selected=select.value;
   select.replaceChildren(new Option('Active run (automatic)',''));
   for(const run of [...active,...runs.filter(r=>!active.includes(r))])
-   select.add(new Option(active.includes(run)?run+' · running':run,run));
+   select.add(new Option(active.includes(run)?run+' · running':archived.includes(run)?run+' · archived':run,run));
   select.value=selected;
  } catch(e) { /* Status polling reports connection errors. */ }
 }
@@ -223,7 +248,7 @@ function syncModels(){
  if(models.includes('allenai/OLMo-2-0425-1B-Instruct')) $('model-help').textContent+=' OLMo has a 4,096-token context window. Long conversations may exceed its capacity.';
 }
 function modelControls(){
- const available=['Qwen/Qwen2.5-1.5B-Instruct','Qwen/Qwen2.5-3B-Instruct','HuggingFaceTB/SmolLM2-1.7B-Instruct','TinyLlama/TinyLlama-1.1B-Chat-v1.0','allenai/OLMo-2-0425-1B-Instruct','HuggingFaceTB/SmolLM3-3B','Qwen/Qwen3-4B-Instruct-2507', 'microsoft/Phi-4-mini-instruct'];
+ const available=OpinionModelControls.available;
  const mixed=$('agent-configuration').value==='heterogeneous',box=$('agent-models');
  const previous=[...box.querySelectorAll('select')].map(s=>s.value);
  if(!$('shared-model').options.length)available.forEach(m=>$('shared-model').add(new Option(m,m)));
@@ -329,6 +354,7 @@ function renderClosureLog(entries) {
 }
 
 function scenarioLabel(scenario) {
+ if(scenario.kind==='binary_question')return scenario.question||scenario.title;
  const entry=catalog.find(e=>e.data.id===scenario.id);
  const base=entry?entry.path.split('/').pop().replace(/\.json$/,''):(scenario.id||'Scenario').replace(/_\d+$/,'');
  return base.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
@@ -339,6 +365,7 @@ function showInfo(title,content) {
 function showScenarioDetails(scenario) {
  if(!scenario)return;
  const content=document.createElement('div');
+ if(scenario.kind==='binary_question'){content.textContent=(scenario.question||scenario.title)+'\n\nPossible answers: Yes / No. Question ID: '+scenario.id;showInfo('StrategyQA question',content);return;}
  const add=(heading,text)=>{if(!text)return;const h=document.createElement('h3'),p=document.createElement('p');h.textContent=heading;p.textContent=text;content.append(h,p);};
  add('Full description',scenario.title);add('Context',scenario.context);add('Topic',scenario.topic);
  for(const k of [1,2]){const option=scenario[`strategy_${k}`];if(option)add(`Strategy ${k} · ${option.name}`,option.candidate);}
@@ -364,3 +391,19 @@ for(const source of document.querySelectorAll('#setup p:not(#error)')) {
  const sync=()=>{button.hidden=source.hidden||!source.textContent.trim();};sync();
  new MutationObserver(sync).observe(source,{attributes:true,attributeFilter:['hidden'],childList:true,subtree:true,characterData:true});
 }
+
+// Retain legacy controls for saved-run compatibility while keeping the active setup question-only.
+for(const id of ['mode','preview-preset','decision-mode','prompt-style','argument_mode','paper-suite','conditions']){
+ const node=$(id);const label=node?.closest('label');if(label)label.hidden=true;else if(node)node.hidden=true;
+}
+for(const id of ['joint-task-controls','persona-help','decision-help','stopping-help','new-scenario'])if($(id))$(id).hidden=true;
+for(const node of document.querySelectorAll('[name=research]'))node.closest('label').hidden=true;
+for(const node of document.querySelectorAll('#setup .setup-grid>p:not(#dataset-help):not(#error):not(#model-help)')){
+ if(node.textContent.includes('Paper suite')||node.textContent.includes('Open and Topic')||node.textContent.includes('model generates a strategy'))node.hidden=true;
+}
+$('dataset-partition').onchange=()=>{
+ const test=$('dataset-partition').value==='test';
+ $('dataset-split').replaceChildren(...(test?[['official_test','Official test · prediction only']]:[['train','Train'],['validation','Validation'],['test','Held-out test'],['all','All questions']]).map(([value,label])=>new Option(label,value)));
+ safe(load)();
+};
+$('dataset-split').onchange=safe(load);$('split-seed').onchange=safe(load);

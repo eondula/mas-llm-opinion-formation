@@ -1,0 +1,8 @@
+Choose your current strategy using the scenario and information available to you.
+{turn}
+{assignment}
+Support your assessment with a relevant scenario fact or evidence card. Explain the main disadvantage you accept with your current choice. If an important question remains, state it specifically; do not invent information to answer it.
+You may retain or revise your strategy. Do not change your choice merely to create disagreement. Avoid repeating an earlier explanation unless it is necessary to address the current point.
+Keep your explanation to one short paragraph.
+{schema}
+Return only the JSON object, without markdown fences or other text.

@@ -160,7 +160,8 @@ def repetition(records, out, device, revision):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--source', type=Path, default=ROOT/'results/studies/experiment_D_v1')
+    from .config import run_path
+    p.add_argument('--source', type=Path, default=run_path('experiment_D_v1'))
     p.add_argument('--output', type=Path, default=ROOT/'results/validation/experiment_D_v1')
     p.add_argument('--mode', choices=['all','stance','repetition'], default='all')
     p.add_argument('--rounds', type=int, nargs='+', default=[0,1,10])

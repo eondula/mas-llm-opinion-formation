@@ -14,7 +14,7 @@ def select_device(torch, requested):
 
 class Runtime:
     instances=weakref.WeakSet()
-    def __init__(self, name, device='auto'):
+    def __init__(self, name, device='auto', revision=None, tokenizer_revision=None, expected_dtype=None):
         print(f'Loading {name}: importing PyTorch', flush=True)
         import torch
         print(f'Loading {name}: importing Transformers', flush=True)
@@ -22,9 +22,15 @@ class Runtime:
         self.torch = torch
         self.device = select_device(torch, device)
         print(f'Loading {name}: tokenizer', flush=True)
-        self.tokenizer = AutoTokenizer.from_pretrained(name)
+        self.tokenizer = AutoTokenizer.from_pretrained(name, **({'revision':tokenizer_revision or revision} if tokenizer_revision or revision else {}))
+        self.tokenizer_revision=tokenizer_revision or revision
         print(f'Loading {name}: model weights', flush=True)
-        self.model = AutoModelForCausalLM.from_pretrained(name, torch_dtype='auto').eval()
+        self.model = AutoModelForCausalLM.from_pretrained(name, torch_dtype='auto', **({'revision':revision} if revision else {})).eval()
+        self.revision=revision
+        if revision and getattr(self.model.config,'_commit_hash',None)!=revision:
+            raise ValueError('Loaded model revision does not match pinned revision')
+        if expected_dtype and str(next(self.model.parameters()).dtype)!=expected_dtype:
+            raise ValueError('Loaded dtype does not match the frozen protocol')
         self.instances.add(self)
         print(f'Loading {name}: moving to {self.device}', flush=True)
         self.activate()
@@ -95,16 +101,8 @@ class Runtime:
         return sum(values), values, rendered
 
     def measure(self, history, scenario, texts):
-        c1, c2 = [scenario[k]['candidate'] for k in ('strategy_1','strategy_2')]
-        probe = texts['stance_probe'].format(candidate_1=c1, candidate_2=c2)
-        messages = history + [{'role':'user','content':probe}]
-        l1, t1, rendered = self.likelihood(messages, c1)
-        l2, t2, _ = self.likelihood(messages, c2)
-        margin = l1-l2
-        return dict(margin=margin, stance=math.tanh(margin/2), likelihoods=[l1,l2], token_log_probs=[t1,t2],
-                    candidate_tokens=[self.tokenizer.convert_ids_to_tokens(self.encode_rendered(rendered+c)['input_ids'][len(self.encode_rendered(rendered)['input_ids']):]) for c in (c1,c2)],
-                    token_counts=[len(t1),len(t2)], normalized_margin=l1/len(t1)-l2/len(t2) if t1 and t2 else None,
-                    rendered_prompt=rendered, probe=probe)
+        from .measurement import measure
+        return measure(self, history, scenario, texts)
 
     def generate(self, messages, max_tokens, continuation_prefix='', sampling=None):
         rendered, inputs = self.inputs(messages, continuation_prefix)

@@ -1,4 +1,5 @@
 """Derived tables and explicit evidence coverage."""
+from .trajectories import read_conversation
 import csv
 import json
 from pathlib import Path
@@ -34,13 +35,13 @@ def export(path):
     import numpy as np
     folder=path/'tables';outcomes=[];changes=[]
     for file in sorted((path/'conversations').glob('*.json')):
-        record=json.loads(file.read_text());rows=record['rows'];states={}
+        record=read_conversation(file);rows=record['rows'];states={}
         for r in rows:states.setdefault(r['round'],{})[r['agent']]=r['strategy']
-        consensus=[t for t,s in states.items() if len(set(s.values()))==1]
+        consensus=[t for t,s in states.items() if all(choice in (1,2) for choice in s.values()) and len(set(s.values()))==1]
         stable=next((t for t in consensus if all(len(set(states[k].values()))==1 and states[k]==states[t] for k in states if k>=t)),None)
         for agent in dict.fromkeys(r['agent'] for r in rows):
             rs=[r for r in rows if r['agent']==agent]
-            outcomes.append(dict(task=file.stem,agent=agent,initial=rs[0]['strategy'],final=rs[-1]['strategy'],switches=sum(a['strategy']!=b['strategy'] for a,b in zip(rs,rs[1:])),stable_agreement_round=stable,final_margin=rs[-1]['post']['margin'],unique_messages=len({r['message'] for r in rs})))
+            outcomes.append(dict(task=file.stem,agent=agent,initial=rs[0]['strategy'],final=rs[-1]['strategy'],switches=sum(a['strategy'] in (1,2) and b['strategy'] in (1,2) and a['strategy']!=b['strategy'] for a,b in zip(rs,rs[1:])),stable_agreement_round=stable,final_margin=rs[-1]['post']['margin'],unique_messages=len({r['message'] for r in rs})))
             for stage in ('decision','post'):
                 pairs=[(a,b) for a,b in zip(rs,rs[1:]) if a[stage] is not None and b[stage] is not None and 'sentiment' in a and 'sentiment' in b]
                 x=np.array([abs(b[stage]['stance']-a[stage]['stance']) for a,b in pairs]);y=np.array([abs(b['sentiment']-a['sentiment']) for a,b in pairs])

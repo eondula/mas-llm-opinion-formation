@@ -1,0 +1,31 @@
+/* Experiment workspace uses the conversation page's shared surfaces and themes. */
+.experiment-layout{grid-template-columns:320px minmax(0,1fr)}
+.experiment-page .experiment-main{min-width:0;max-width:none;width:100%}
+.experiment-page fieldset{border:0;padding:0;margin:0;min-width:0}
+.experiment-page .setup-grid{grid-template-columns:minmax(0,1fr);gap:16px}
+.experiment-page .setup-grid label{letter-spacing:.4px;text-transform:none}
+.experiment-page .setup-grid input,.experiment-page .setup-grid select,.experiment-page .setup-grid textarea{font:inherit;max-width:100%;min-width:0}
+.experiment-page #setup input,.experiment-page #setup textarea{background:var(--surface);color:var(--ink);border-color:var(--edge)}
+.experiment-page #setup textarea{min-height:64px}
+.experiment-page #agent-models,.experiment-page #forced-answers{display:grid;gap:12px}
+.experiment-page #sampling-controls{display:grid;gap:12px}
+.experiment-page .check{display:flex;gap:8px;align-items:center}
+.experiment-page .check input{margin:0;width:auto}
+.experiment-page .hint{font-size:12px;color:var(--muted);line-height:1.6}
+.experiment-page .actions{display:grid;gap:10px;margin-top:20px}
+.experiment-page .actions #start{background:var(--button);color:var(--on-button);border-color:var(--button)}
+.experiment-page #stop,.experiment-page #open,.experiment-page #preview-prompts{background:var(--surface);color:var(--ink);border:1px solid var(--edge)}
+.experiment-page .experiment-main>section:not(.context){background:var(--surface);border:1px solid var(--edge);border-radius:14px;padding:24px;margin-bottom:24px}
+.experiment-page .saved{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:18px 0}
+.experiment-page .saved label{min-width:220px;max-width:100%}
+.experiment-page progress{width:100%;height:6px;accent-color:var(--a)}
+.experiment-page #phase{font-size:14px;overflow-wrap:anywhere}
+.experiment-page #output{overflow-wrap:anywhere}
+.experiment-page .table-wrap{overflow-x:auto}
+.experiment-page table{border-collapse:collapse;width:100%;font-size:12px}
+.experiment-page th,.experiment-page td{padding:12px;text-align:left;border-bottom:1px solid var(--edge);white-space:nowrap}
+.experiment-page th{background:var(--soft);font-weight:600;color:var(--muted)}
+.experiment-page td:first-child{max-width:270px;white-space:normal;overflow-wrap:anywhere}
+.experiment-page .sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(max-width:1000px){.experiment-layout{grid-template-columns:270px minmax(0,1fr)}}
+@media(max-width:700px){.experiment-layout{grid-template-columns:1fr}.experiment-page .experiment-main>section:not(.context){padding:18px}}

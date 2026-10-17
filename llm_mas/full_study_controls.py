@@ -6,7 +6,7 @@ import gc
 from pathlib import Path
 from .config import ROOT, digest
 from .prompts import for_condition
-from .runner import write
+from .storage import write
 from .full_study_analysis import table
 
 

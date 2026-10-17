@@ -1,0 +1,6 @@
+Choose your current strategy using the scenario and discussion so far.
+{turn}
+{assignment}
+{source}
+{schema}
+Return only the JSON object, without markdown fences or other text.

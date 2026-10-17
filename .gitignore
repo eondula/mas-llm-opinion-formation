@@ -44,13 +44,16 @@ outputs/
 *.pth
 *.safetensors
 .cache/
+.refactor-backups/
+/data/strategyqa/*.json
+/data/strategyqa/*.zip
+!/data/strategyqa/source.json
 
 # Earlier implementation and historical documentation
 /src/
 /legacy/
 /legacy_2/
 /analysis/
-/docs/
 /PLAN.md
 /PILOT_IMPLEMENTATION.md
 /LICENSE
@@ -64,10 +67,6 @@ outputs/
 /scenarios/scenarios.txt
 /scenarios/scenarios_test.txt
 
-# Keep current tests; exclude older test suites
-/tests/*
-!/tests/refactor/
-
 # LaTeX compilation intermediates
 *.aux
 *.fls
@@ -76,3 +75,12 @@ outputs/
 *.toc
 *.out
 /results/
+
+# Local documentation, tests and archives
+/docs/
+/tests/
+/test/
+/archive/
+/REPOSITORY_AUDIT.md
+/STAGE2_IMPLEMENTATION.md
+/STAGE2_PRESERVATION.json

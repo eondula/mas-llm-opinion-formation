@@ -17,6 +17,7 @@ def get_sentiment_device():
     return "cpu"
 
 
+SENTIMENT_REVISION = '714eb0fa89d2f80546fda750413ed43d93601a13'
 sentiment_device = get_sentiment_device()
 
 _loaded = False
@@ -30,11 +31,11 @@ def load_sentiment():
     
     
     sentiment_tokenizer = AutoTokenizer.from_pretrained(
-        SENTIMENT_MODEL_NAME
+        SENTIMENT_MODEL_NAME, revision=SENTIMENT_REVISION
     )
     
     sentiment_model = AutoModelForSequenceClassification.from_pretrained(
-        SENTIMENT_MODEL_NAME
+        SENTIMENT_MODEL_NAME, revision=SENTIMENT_REVISION
     )
     
     sentiment_model.to(sentiment_device)

@@ -1,0 +1,5 @@
+Assess your current answer to the original question using your reasoning and the discussion so far.
+
+Return exactly one of the following answers, with no explanation or other text:
+{candidate_1}
+{candidate_2}
