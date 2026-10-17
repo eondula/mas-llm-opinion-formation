@@ -35,7 +35,7 @@ def execute(raw, name=None, resume=False):
     if config.get('pilot_protocol'):
         from .pilot import assert_lock
         protocol_hash=assert_lock(config,texts)['protocol_hash']
-    reserved = config.get('output_layout') == 'experiment' and path.exists() and set(p.name for p in path.iterdir()) <= {'config.json','status.json','worker.log'} and (path/'config.json').exists() and read(path/'config.json') == config
+    reserved = config.get('output_layout') == 'experiment' and path.exists() and set(p.name for p in path.iterdir()) <= {'config.json','status.json','worker.log','worker.json','worker.json.tmp'} and (path/'config.json').exists() and read(path/'config.json') == config
     if path.exists() and not reserved:
         if not resume: raise ValueError(f'Run already exists: {path}')
         manifest = json.loads((path/'manifest.json').read_text())

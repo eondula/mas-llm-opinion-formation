@@ -40,9 +40,9 @@ python -m llm_mas dashboard --port 8766
 
 For Apple Silicon use `pilot-freeze --device mps`. New locks capture source, prompts, dependencies, device and CUDA/GPU identity in local ignored files. The dashboard shows the required freeze command and disables pilot launch until it passes. Refresh the preset after freezing. A changed lock is never overwritten; start a separately versioned protocol for scientific changes.
 
-The v3 CUDA preset uses float32 weights for compatibility with NVIDIA GPUs that lack bfloat16 support; MPS retains bfloat16. These are separate protocols and should remain separate analysis conditions. Actual checkpoint and tokenizer commits remain pinned. Unavailable devices fail explicitly rather than falling back to CPU. A CUDA build of PyTorch and a GPU allocation are required; login nodes may have no CUDA device even when the cluster has GPUs.
+The v4 CUDA preset uses float32 weights for compatibility with NVIDIA GPUs that lack bfloat16 support; MPS retains bfloat16. These are separate protocols and should remain separate analysis conditions. Actual checkpoint and tokenizer commits remain pinned. Unavailable devices fail explicitly rather than falling back to CPU. A CUDA build of PyTorch and a GPU allocation are required; login nodes may have no CUDA device even when the cluster has GPUs.
 
-Equivalent CLI launch: `python -m llm_mas run --config studies/pilot_cuda_v3.json` or `studies/pilot_mps_v3.json`. The earlier v1/v2 configurations and locks are retained for provenance; this release uses v3 to keep its changed execution source separate from existing batches. The updated runner rejects collection or resume under retired versions. Finish existing batches with their original checkout. Restart an old dashboard process after pulling so it loads the new manifest lookup.
+Equivalent CLI launch: `python -m llm_mas run --config studies/pilot_cuda_v4.json` or `studies/pilot_mps_v4.json`. The earlier v1/v2/v3 configurations and locks are retained for provenance; this release uses v4 to keep its changed execution source separate from existing batches. The updated runner rejects collection or resume under retired versions. Finish existing batches with their original checkout. Restart an old dashboard process after pulling so it loads the new manifest lookup.
 
 The dashboard uses shared border-box sizing and flexible grids, with a single-column layout on smaller viewports. Wide summary tables scroll inside labeled, keyboard-focusable regions. Skip links, visible keyboard focus, labeled progress, chart descriptions, touch targets and reduced-motion preferences follow [W3C reflow](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html), [focus](https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html) and [target-size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html) guidance. Automated structural checks do not establish full WCAG conformance.
 
@@ -50,7 +50,7 @@ The dashboard uses shared border-box sizing and flexible grids, with a single-co
 
 **Finish any existing foreground pilot before pulling this update.** Changing source files during a frozen collection invalidates that batch. New background behavior cannot be applied retroactively to an already-running foreground process.
 
-After updating and freezing the v3 protocol on your GPU node, start the dashboard without tying it to an SSH terminal:
+After updating and freezing the v4 protocol on your GPU node, start the dashboard without tying it to an SSH terminal:
 
 ```bash
 bash scripts/start_dashboard.sh 8766

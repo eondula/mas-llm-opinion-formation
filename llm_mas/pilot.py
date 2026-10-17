@@ -7,11 +7,11 @@ from pathlib import Path
 from .config import ROOT,digest
 from .storage import read,write
 
-PROTOCOL='strategyqa-pilot-v3-mps'
+PROTOCOL='strategyqa-pilot-v4-mps'
 SELECTION='studies/pilot_question_selection.json'
-SPEC='studies/pilot_mps_v3.json'
-LOCK='studies/pilot_mps_v3.lock.json'
-PROTOCOLS={'strategyqa-pilot-v3-'+device:('studies/pilot_'+device+'_v3.json','studies/pilot_'+device+'_v3.lock.json') for device in ('mps','cuda')}
+SPEC='studies/pilot_mps_v4.json'
+LOCK='studies/pilot_mps_v4.lock.json'
+PROTOCOLS={'strategyqa-pilot-v4-'+device:('studies/pilot_'+device+'_v4.json','studies/pilot_'+device+'_v4.lock.json') for device in ('mps','cuda')}
 
 def paths(protocol):
     if protocol not in PROTOCOLS:
@@ -38,7 +38,7 @@ FIELDS=('agent_configuration','mode','models','agents','model_configurations','m
 
 def preset(root=ROOT,device=None,protocol=None):
     selection=read(Path(root)/SELECTION)
-    protocol=protocol or 'strategyqa-pilot-v3-'+(device or 'mps')
+    protocol=protocol or 'strategyqa-pilot-v4-'+(device or 'mps')
     config=read(Path(root)/paths(protocol)[0])
     if config['question_ids']!=selection['question_ids'] or config['dataset']!=dict(selection['source'],split='train',split_seed=selection['split_seed']):
         raise ValueError('Pilot specification differs from frozen question manifest')
