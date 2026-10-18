@@ -289,11 +289,11 @@ def serve(port=8766):
                         configuration=ROOT/'results/experiments/configurations'/f'{name}.json'
                         write(configuration,config)
                         # A log lives with the experiment even while the model loads.
-                        folder.mkdir(parents=True)
-                        write(folder/'config.json',config)
+                        from .launch import reserve
+                        launch_token=reserve(folder,config)
                         write(folder/'status.json',dict(phase='starting',completed=0,total=sum(len(c['scenarios'])*(c['rounds']+1)*c['agents'] for c in configurations(config))))
                         with (folder/'worker.log').open('w') as log:
-                            command=[sys.executable,'-u','-m','llm_mas','run','--config',str(configuration),'--run-id',name]
+                            command=[sys.executable,'-u','-m','llm_mas','run','--config',str(configuration),'--run-id',name,'--launch-token',launch_token]
                             try:
                                 process=subprocess.Popen(command,cwd=ROOT,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True,close_fds=True)
                                 jobs.register(folder,process,command)

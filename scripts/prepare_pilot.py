@@ -8,7 +8,7 @@ def main():
     source=root/'studies/pilot_question_selection.json'
     selection=json.loads(source.read_text())
     for device in ('mps','cuda'):
-        config=json.loads((root/f'studies/pilot_{device}_v5.json').read_text())
+        config=json.loads((root/f'studies/pilot_{device}_v6.json').read_text())
         if config['question_ids']!=selection['question_ids']:
             raise ValueError('Pilot selection differs from bundled manifest')
     print('Tracked pilot inputs ready. No docs folder is required.')

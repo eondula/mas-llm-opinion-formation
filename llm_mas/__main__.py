@@ -28,6 +28,7 @@ def main():
             parser.add_argument('--config',required=True,help='JSON configuration')
             parser.add_argument('--device',choices=['auto','cpu','cuda','mps'],help='Override configuration device')
         parser.add_argument('--run-id')
+        parser.add_argument('--launch-token',help=argparse.SUPPRESS)
         parser.add_argument('--dry-run',action='store_true')
         parser.add_argument('--repetitions', type=int, help='Independent realizations per configuration/task')
         parser.add_argument('--seed', type=int, help='Base seed for sampled generation')
@@ -134,6 +135,7 @@ def main():
         planned=list(configurations(config))
         print(json.dumps(dict(conversations=sum(len(c['scenarios']) for c in planned),configuration_count=len(planned),config=config,prompt_preview=initial(config['scenarios'][0],templates(),config['presentation_order'],config['agents'])),indent=2));return
     from .runner import execute
-    print(execute(config,args.run_id,resume=args.command=='resume'))
+    launch_token=getattr(args,'launch_token',None)
+    print(execute(config,args.run_id,resume=args.command=='resume',**({'launch_token':launch_token} if launch_token else {})))
 
 if __name__=='__main__':main()

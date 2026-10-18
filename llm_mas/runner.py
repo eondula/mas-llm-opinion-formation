@@ -13,9 +13,10 @@ from .provenance import source_hashes, environment
 from .trajectories import SCHEMA_VERSION, read_conversation
 
 
-def execute(raw, name=None, resume=False):
+def execute(raw, name=None, resume=False, launch_token=None):
     config = resolve(raw)
-    name = resolve_run_id(name or config.pop('run_id', None))
+    configured_name=config.pop('run_id',None)
+    name = resolve_run_id(name or configured_name)
     path = ROOT/'results/experiments'/name if config.get('output_layout') == 'experiment' else run_path(name)
     existing = run_path(name)
     if existing != path and existing.exists():
@@ -35,7 +36,14 @@ def execute(raw, name=None, resume=False):
     if config.get('pilot_protocol'):
         from .pilot import assert_lock
         protocol_hash=assert_lock(config,texts)['protocol_hash']
-    reserved = config.get('output_layout') == 'experiment' and path.exists() and set(p.name for p in path.iterdir()) <= {'config.json','status.json','worker.log','worker.json','worker.json.tmp'} and (path/'config.json').exists() and read(path/'config.json') == config
+    if launch_token:
+        if resume:raise ValueError('Dashboard launch token cannot be used to resume existing data')
+        from .launch import claim
+        reserved=claim(path,config,launch_token)
+    else:
+        # Backward compatibility for older launchers; completed scientific data is never reused.
+        from .launch import legacy_reservation
+        reserved = config.get('output_layout') == 'experiment' and legacy_reservation(path,config)
     if path.exists() and not reserved:
         if not resume: raise ValueError(f'Run already exists: {path}')
         manifest = json.loads((path/'manifest.json').read_text())
