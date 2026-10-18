@@ -144,6 +144,10 @@ def execute(raw, name=None, resume=False, launch_token=None):
                     def initial_progress(**event):
                         nonlocal generated_done
                         generated_done+=1
+                        # Publish each shared starting response immediately; the
+                        # normal branch replay is deduplicated by response identity.
+                        with (path/'events.jsonl').open('a') as out:
+                            out.write(json.dumps(dict(task=target.stem, **event))+'\n')
                         status('initialization',phase_completed=generated_done,phase_total=generation_total)
                     snapshot=shared_initialization(path,execution,scenario,texts,runtimes,protocol_hash,initial_progress)
                 rows = conversation(execution, scenario, texts, runtimes, emit,**({'initial_rows':snapshot['rows']} if snapshot else {}))

@@ -1,12 +1,13 @@
-const $=id=>document.getElementById(id);let catalog=[],events=[],lastIndex=0,questionLoad=0;
+const $=id=>document.getElementById(id);let catalog=[],events=[],lastIndex=0,questionLoad=0,questionReady=false,lastKnownBusy=false,launching=false;
 const DATASET_LABELS={strategyqa:'StrategyQA',boolq:'BoolQ',proofwriter:'ProofWriter'};
 function datasetSpec(){
  const name=$('dataset-name')?.value||'strategyqa';
  const depths=name==='proofwriter'?String($('dataset-depths').value).split(/[\s,]+/).filter(Boolean).map(Number):null;
  return {name,...(depths?{proof_depths:depths}:{})};
 }
-async function api(path,data){const r=await fetch('/api/'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{});const v=await r.json();if(!r.ok)throw Error(v.error);return v;}
+async function api(path,data,signal){const r=await fetch('/api/'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),signal}:{signal});const v=await r.json();if(!r.ok)throw Error(v.error);return v;}
 function config(){
+ if($('mode').value==='experiment' && $('dataset-partition')&&!questionReady)throw Error('Wait for the selected dataset and depth filters to load before starting.');
  if($('mode').value==='experiment' && $('dataset-partition'))return {
   mode:'experiment',dataset:{...datasetSpec(),partition:$('dataset-partition').value,split:$('dataset-split').value,split_seed:Number($('split-seed').value)},
   question_ids:[...$('scenarios').selectedOptions].map(o=>o.value),question_count:Number($('question-count').value),question_seed:Number($('question-seed').value),
@@ -20,9 +21,11 @@ function config(){
 async function load(){
  if($('mode').value==='experiment' && $('dataset-partition')){
   const spec=datasetSpec(),ticket=++questionLoad;
+  questionReady=false;catalog=[];$('scenarios').replaceChildren();$('run').disabled=true;$('dataset-help').textContent='Loading '+DATASET_LABELS[spec.name]+' questions…';
   const result=await api('questions?dataset='+spec.name+(spec.proof_depths?'&proof_depths='+spec.proof_depths.join(','):'')+'&partition='+$('dataset-partition').value+'&split='+$('dataset-split').value+'&split_seed='+encodeURIComponent($('split-seed').value));
   // A slower earlier request must not overwrite the list for a newer dataset or depth choice.
   if(ticket!==questionLoad)return;
+  questionReady=true;$('run').disabled=launching||lastKnownBusy;
   catalog=result.questions.map(q=>({path:q.id,data:{kind:'binary_question',id:q.id,title:q.question,question:q.question}}));
   $('scenarios').replaceChildren(...catalog.map(e=>new Option(e.data.question+' · '+e.path,e.path)));
   $('dataset-help').textContent=`${catalog.length} questions in this split. Leave selection empty to sample the configured count. `+(result.labeled?'Labels are used after simulation only.':'Public labels are unavailable; correctness will remain unscored.');
@@ -37,15 +40,16 @@ function startingControls(){const box=$('forced-strategies'),previous=[...box.qu
 $('initialization').onchange=startingControls;$('agents').onchange=()=>{startingControls();modelControls();draw(lastIndex);};const modeChange=$('mode').onchange;$('mode').onchange=()=>{modeChange();startingControls();};startingControls();
 $('preview-prompts').onclick=safe(async()=>{const dialog=$('prompt-dialog');$('prompt').textContent='Loading configuration and prompts…';dialog.showModal();try{const result=await api('preview',config());$('prompt').textContent=JSON.stringify(result,null,2);}catch(error){$('prompt').textContent=error.message;throw error;}});
 $('run').onclick=safe(async()=>{
+ const settings=config();
+ launching=true;resetConversation();$('saved-run').value='';
  $('run').disabled=true;$('run-state').textContent='Starting';
  try {
-  const result=await api('run',config());
-  $('saved-run').value='';following=true;currentRun=null;selectedTask=null;events=[];
-  $('title').textContent='Preparing the conversation…';
+  const result=await api('run',settings);
+  resetConversation(result.run_id);
   $('description').textContent='Run '+result.run_id+' · loading the model';
-  await poll();
- } catch(error){$('run').disabled=false;$('run-state').textContent='Unable to start';throw error;}
-});$('stop').onclick=safe(()=>api('stop',{}));
+ } catch(error){$('run-state').textContent='Unable to start';throw error;}
+ finally{launching=false;$('run').disabled=lastKnownBusy||!questionReady;poll();}
+});$('stop').onclick=safe(()=>api('stop',{run_id:currentRun||requestedRun||undefined}));
 $('close-prompt').onclick=()=>$('prompt-dialog').close();
 $('new-scenario').onclick=()=>{$('scenario-error').textContent='';$('scenario-dialog').showModal();};
 $('close-scenario').onclick=()=>$('scenario-dialog').close();
@@ -71,6 +75,7 @@ $('scenario-form').onsubmit=async event=>{
 };
 
 let selectedTask=null, following=true, timer=null, currentRun=null, activeConfig=null, activeTasks=[], lastPhase=null;
+let viewVersion=0,requestedRun=null,pollAgain=false,pollController=null;
 const names=[];
 const fmt=n=>typeof n==='number'?n.toFixed(3):'—';
 $('theme-toggle').onclick=()=>{const dark=document.documentElement.dataset.theme!=='dark';document.documentElement.dataset.theme=dark?'dark':'light';$('theme-toggle').textContent=dark?'Light theme':'Dark theme';localStorage.setItem('opinion-lab-theme',dark?'dark':'light');draw(lastIndex);};
@@ -94,12 +99,12 @@ function draw(index){
  updateHeading();
  const current=selectedTask||events[index]?.task, subset=events.slice(0,index+1).filter(e=>e.task===current), seen={};
  for(const e of subset)seen[e.row.agent]=e.row;
- const all=events.filter(e=>e.task===current);
+ const all=subset;
  const taskIndex=Number((current||'0').split('_')[0]);
  const settings=activeTasks[taskIndex]||activeConfig;
  const n=settings?.agents||Number($('agents').value);
  const questionRun=settings?Boolean(settings.dataset):$('mode').value==='experiment';
- if($('stance-scale'))$('stance-scale').textContent=questionRun?'After own response · No −1 → Yes +1':'After own response · S2 −1 → S1 +1';
+ if($('stance-scale'))$('stance-scale').textContent=questionRun?'Answer-selection stance · No −1 → Yes +1':'After own response · S2 −1 → S1 +1';
  if($('positive-choice-label'))$('positive-choice-label').textContent=questionRun?'Yes':'S1';
  if($('negative-choice-label'))$('negative-choice-label').textContent=questionRun?'No':'S2';
  names.splice(0,names.length,...Array.from({length:n},(_,i)=>i<26?`Agent ${String.fromCharCode(65+i)}`:`Agent ${i+1}`));
@@ -118,13 +123,14 @@ function draw(index){
  bubbleFrames.set(name,frame);
  node.querySelector('.bubble').classList.toggle('has-response',Boolean(shown));node.querySelector('.circle').className='circle '+(row?.strategy!=null?'s'+row.strategy:'unknown');
  node.querySelector('.strategy-label').textContent=row?(row.answer??(row.strategy==null?'Invalid generated choice':'Strategy '+row.strategy)):'No answer yet';node.querySelector('.forced').textContent=row?.forced?'Forced start':row?(row.choice_status==='valid'?'Generated choice':row.strategy==null?'':settings?.decision_mode==='generated'?'Generated choice':'Stance-derived choice'):'';
- node.querySelector('.activity').textContent=row?`Round ${row.round} · stance ${fmt((row.decision_time||row.post).stance)} · margin ${fmt((row.decision_time||row.post).margin)}${typeof row.correct==='boolean'?(row.correct?' · correct':' · incorrect'):''}`:'Waiting';node.querySelector('.message').title=row?.model||'';
+ node.querySelector('.activity').textContent=row?`Round ${row.round} · stance ${fmt((row.decision_time||row.post||{}).stance)} · margin ${fmt((row.decision_time||row.post||{}).margin)}${typeof row.correct==='boolean'?(row.correct?' · correct':' · incorrect'):''}`:'Waiting';node.querySelector('.message').title=row?.model||'';
  if(n===2&&i===0)arena.insertBefore(node,arena.querySelector('.exchange'));else arena.append(node);
  });
  drawJointSheet(subset,settings,n,current);
- $('round').textContent=subset.length?'Round '+subset.at(-1).row.round:'Round —';$('checkpoint-label').textContent=$('round').textContent;
+ const latestRound=subset.at(-1)?.row.round,roundRows=subset.filter(e=>e.row.round===latestRound);
+ $('round').textContent=subset.length?'Round '+latestRound+(settings?.schedule==='synchronous'&&roundRows.length<n?' · '+roundRows.length+'/'+n+' responses':''):'Round —';$('checkpoint-label').textContent=$('round').textContent;
  $('delivery').textContent='';$('delivery').hidden=true;
- chart('stance-chart',all.length?Object.fromEntries(names.map(name=>[name,all.filter(e=>e.row.agent===name).map(e=>(e.row.decision_time||e.row.post).stance)])):null,all.some(e=>e.row.decision_time)?'Decision-time stance':'Post-response probe stance');
+ chart('stance-chart',all.length?Object.fromEntries(names.map(name=>[name,all.filter(e=>e.row.agent===name).map(e=>(e.row.decision_time||e.row.post||{}).stance)])):null,all.some(e=>e.row.decision_time)?'Decision-time stance':'Post-response probe stance');
  const sent=all.some(e=>typeof e.row.sentiment==='number');chart('sentiment-chart',sent?Object.fromEntries(names.map(name=>[name,all.filter(e=>e.row.agent===name).map(e=>e.row.sentiment)])):null,'Sentiment available after scoring');
  const legend=document.querySelector('.legend');legend.replaceChildren();names.forEach((name,i)=>{const span=document.createElement('span');span.textContent=name;span.style.color=agentColor(i);legend.append(span);});
  requestAnimationFrame(drawLinks);
@@ -191,22 +197,75 @@ function drawLinks(){
  }paint(began);
 }
 $('size').oninput=()=>draw(lastIndex);window.addEventListener('resize',drawLinks);
-$('checkpoint').oninput=()=>{following=false;lastIndex=Number($('checkpoint').value);draw(lastIndex);};
-$('follow').onclick=()=>{following=true;$('follow').textContent='Following live';lastIndex=Math.max(0,events.length-1);selectedTask=events[lastIndex]?.task;draw(lastIndex);};
-$('condition').onchange=()=>{selectedTask=$('condition').value;following=false;lastIndex=events.map(e=>e.task).lastIndexOf(selectedTask);draw(lastIndex);};
+$('checkpoint').oninput=()=>{following=false;lastIndex=Number($('checkpoint').value);selectedTask=events[lastIndex]?.task;$('condition').value=selectedTask||'';$('follow').textContent='Follow live';draw(lastIndex);};
+$('follow').onclick=()=>{if(timer){clearInterval(timer);timer=null;}$('play').textContent='Play responses';following=true;$('follow').textContent='Following live';lastIndex=Math.max(0,events.length-1);selectedTask=events[lastIndex]?.task;$('condition').value=selectedTask||'';$('checkpoint').value=lastIndex;draw(lastIndex);};
+$('condition').onchange=()=>{if(timer){clearInterval(timer);timer=null;}$('play').textContent='Play responses';$('follow').textContent='Follow live';selectedTask=$('condition').value;following=false;lastIndex=Math.max(0,events.map(e=>e.task).lastIndexOf(selectedTask));$('checkpoint').value=lastIndex;draw(lastIndex);};
 $('play').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('play').textContent='Play responses';return;}following=false;const indices=events.map((e,i)=>e.task===selectedTask?i:-1).filter(i=>i>=0);let at=0;timer=setInterval(()=>{if(at>=indices.length){clearInterval(timer);timer=null;$('play').textContent='Play responses';return;}lastIndex=indices[at++];$('checkpoint').value=lastIndex;draw(lastIndex);},Number($('playback-speed').value));$('play').textContent='Pause';};
+function resetConversation(run=null){
+ viewVersion++;requestedRun=run;pollController?.abort();pollAgain=true;
+ if(timer){clearInterval(timer);timer=null;}$('play').textContent='Play responses';
+ following=true;currentRun=null;selectedTask=null;events=[];activeConfig=null;activeTasks=[];lastPhase=null;lastIndex=0;
+ bubbleFrames.clear();lastAnimatedDelivery=null;$('condition').replaceChildren();
+ $('error').textContent='';$('evaluation-summary').textContent='';
+ $('title').textContent='Preparing the conversation…';$('description').textContent=run?'Run '+run+' · waiting for responses':'Waiting for a run';
+ $('follow').textContent='Following live';draw(0);
+}
 let polling=false;
-async function poll(){if(polling)return;polling=true;try{const d=await api('status?scope=main'+($('saved-run').value?'&run_id='+encodeURIComponent($('saved-run').value):''));activeConfig=d.config;activeTasks=d.tasks||[];renderClosureLog(d.closure_events||[]);$('zip-download').hidden=!d.run_id;$('zip-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/paper_outputs.zip';$('figure-download').hidden=!d.run_id;$('figure-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/figures/index.html';$('full-report').hidden=!d.report_available;$('full-report').href='/results/'+encodeURIComponent(d.run_id||'')+'/index.html';updateHeading();$('connection').textContent='Connected';if($('evaluation-summary'))$('evaluation-summary').textContent=d.evaluation?(d.evaluation.accuracy==null?'Correctness unavailable: no public labels.':`Response accuracy: ${(100*d.evaluation.accuracy).toFixed(1)}% · invalid outputs: ${d.evaluation.invalid_responses}`):'';$('run-state').textContent=d.status.phase+(d.status.termination?.reason ? ' · '+(({system_detected_stability:'System-detected stability',system_detected_repetition:'System-detected repetition',agents_accepted_closure:'Agents accepted closure',budget_exhausted:'Round budget exhausted',max_rounds:'Maximum rounds reached',all_agents_finished:'All agents finished (legacy)'})[d.status.termination.reason]||d.status.termination.reason)+' (round '+d.status.termination.round+')':'');$('progress').textContent=`${d.status.completed||0} / ${d.status.total||0}`;$('study-progress').max=d.status.total||1;$('study-progress').value=d.status.completed||0;$('timing').textContent=`Elapsed ${Math.round(d.status.elapsed_seconds||0)}s · ETA ${d.status.estimated_remaining_seconds==null?'estimating':Math.round(d.status.estimated_remaining_seconds)+'s'}`;$('run').disabled=d.running||d.worker_busy;$('stop').disabled=!d.can_stop;
- if(d.running && !d.events.length) {
-  $('title').textContent='Preparing the conversation…';
-  $('description').textContent=d.status.log_tail?.trim().split(/\r?\n/).filter(Boolean).at(-1)||('Loading '+(d.status.model||'model')+' · first response pending');
+async function poll(){
+ if(launching)return;
+ if(polling){pollAgain=true;return;}
+ polling=true;pollAgain=false;
+ const version=viewVersion,run=$('saved-run').value||requestedRun;
+ const controller=new AbortController();pollController=controller;
+ const timeout=setTimeout(()=>controller.abort(),15000);
+ try{
+  const d=await api('status?scope=main'+(run?'&run_id='+encodeURIComponent(run):''),undefined,controller.signal);
+  if(version!==viewVersion||launching)return;
+  if(run&&d.run_id!==run)return;
+  const changedRun=d.run_id!==currentRun;
+  if(changedRun){
+   if(timer){clearInterval(timer);timer=null;}$('play').textContent='Play responses';
+   selectedTask=null;lastIndex=0;following=true;$('follow').textContent='Following live';bubbleFrames.clear();lastAnimatedDelivery=null;
+  }
+  activeConfig=d.config;activeTasks=d.tasks||[];renderClosureLog(d.closure_events||[]);
+  $('zip-download').hidden=!d.run_id;$('zip-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/paper_outputs.zip';
+  $('figure-download').hidden=!d.run_id;$('figure-download').href='/results/'+encodeURIComponent(d.run_id||'')+'/figures/index.html';
+  $('full-report').hidden=!d.report_available;$('full-report').href='/results/'+encodeURIComponent(d.run_id||'')+'/index.html';
+  $('connection').textContent='Connected';
+  $('evaluation-summary').textContent=d.evaluation?(d.evaluation.accuracy==null?'Correctness unavailable: no public labels.':`Response accuracy: ${(100*d.evaluation.accuracy).toFixed(1)}% · invalid outputs: ${d.evaluation.invalid_responses}`):'';
+  $('run-state').textContent=d.status.phase+(d.status.termination?.reason?' · '+d.status.termination.reason.replaceAll('_',' ')+' (round '+d.status.termination.round+')':'');
+  $('progress').textContent=`${d.status.completed||0} / ${d.status.total||0}`;
+  const phaseProgress=d.status.phase_total&&!['complete','failed','cancelled'].includes(d.status.phase);
+  $('study-progress').max=(phaseProgress?d.status.phase_total:d.status.total)||1;
+  $('study-progress').value=(phaseProgress?d.status.phase_completed:d.status.completed)||0;
+  $('timing').textContent=`Elapsed ${Math.round(d.status.elapsed_seconds||0)}s · ETA ${d.status.estimated_remaining_seconds==null?'estimating':Math.round(d.status.estimated_remaining_seconds)+'s'}`;
+  lastKnownBusy=Boolean(d.running||d.worker_busy);$('run').disabled=lastKnownBusy||launching||!questionReady;$('stop').disabled=!d.can_stop;
+  if(changedRun||JSON.stringify(d.events)!==JSON.stringify(events)||lastPhase!==d.status.phase){
+   lastPhase=d.status.phase;currentRun=d.run_id;events=d.events||[];
+   const tasks=[...new Set(events.map(e=>e.task))];
+   $('condition').replaceChildren(...tasks.map(t=>new Option('Conversation '+t,t)));
+   if(following||!tasks.includes(selectedTask)){lastIndex=Math.max(0,events.length-1);selectedTask=events[lastIndex]?.task;}
+   lastIndex=Math.min(lastIndex,Math.max(0,events.length-1));
+   $('condition').value=selectedTask||'';$('checkpoint').max=Math.max(0,events.length-1);$('checkpoint').value=lastIndex;
+   $('checkpoint').disabled=!events.length;$('play').disabled=!events.length;draw(lastIndex);
+  }
+  if(!events.length){
+   $('title').textContent=d.running?'Preparing the conversation…':'No conversation responses yet';
+   $('description').textContent=d.running?(d.status.log_tail?.trim().split(/\r?\n/).filter(Boolean).at(-1)||('Loading '+(d.status.model||'model')+' · first response pending')):'Select a saved run or start a new experiment.';
+  }
+  if(d.status.error)$('error').textContent=d.status.error;
+ }catch(e){
+  if(version!==viewVersion||launching)return;
+  $('connection').textContent='Reconnecting…';$('error').textContent=e.name==='AbortError'?'Status request timed out; retrying.':e.message;
+ }finally{
+  clearTimeout(timeout);if(pollController===controller)pollController=null;polling=false;
+  if(pollAgain&&!launching){pollAgain=false;setTimeout(poll,0);}
  }
- if(d.run_id!==currentRun||JSON.stringify(d.events)!==JSON.stringify(events)||lastPhase!==d.status.phase){lastPhase=d.status.phase;currentRun=d.run_id;events=d.events;const tasks=[...new Set(events.map(e=>e.task))];$('condition').replaceChildren(...tasks.map(t=>new Option('Conversation '+t,t)));if(following||!tasks.includes(selectedTask)){lastIndex=Math.max(0,events.length-1);selectedTask=events[lastIndex]?.task;} $('condition').value=selectedTask||'';$('checkpoint').max=Math.max(0,events.length-1);$('checkpoint').value=lastIndex;$('checkpoint').disabled=!events.length;$('play').disabled=!events.length;draw(lastIndex);}if(d.status.error)$('error').textContent=d.status.error;
- }catch(e){$('connection').textContent='Disconnected';$('error').textContent=e.message;}finally{polling=false;}}
-setInterval(poll,2000);poll();draw(0);
+}
+setInterval(poll,1000);poll();draw(0);
 function chart(container, trajectories, caption) {
   const box=$(container);box.replaceChildren();
-  if(!trajectories) {const p=document.createElement('p');p.textContent=caption;box.append(p);return;}
+  if(!trajectories||!Object.values(trajectories).some(values=>values.some(Number.isFinite))) {const p=document.createElement('p');p.textContent=caption;box.append(p);return;}
   const ns='http://www.w3.org/2000/svg', W=520,H=235,l=42,r=15,t=20,b=32;
   const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('role','img');svg.setAttribute('aria-label',caption);
   const make=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;svg.append(el);return el;};
@@ -214,7 +273,7 @@ function chart(container, trajectories, caption) {
   const n=Math.max(...names.map(k=>trajectories[k]?.length||0));const x=i=>l+i/Math.max(n-1,1)*(W-l-r),y=v=>t+(1-v)/2*(H-t-b);
   for(const v of [-1,0,1]){make('line',{x1:l,y1:y(v),x2:W-r,y2:y(v),stroke:'var(--edge)'});make('text',{x:l-9,y:y(v)+4,'text-anchor':'end','font-size':11,fill:'var(--muted)'},v);}
   const step=Math.max(1,Math.ceil((n-1)/8));for(let i=0;i<n;i++)if(i%step===0||i===n-1)make('text',{x:x(i),y:H-12,'text-anchor':'middle','font-size':11,fill:'var(--muted)'},i);
-  names.forEach((name,j)=>{const values=trajectories[name]||[],color=agentColor(j);const points=values.map((v,i)=>`${x(i)},${y(v)}`).join(' ');make('polyline',{points,fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':['','6 4','2 3','9 3 2 3'][j%4]});values.forEach((v,i)=>{const dot=make('circle',{cx:x(i),cy:y(v),r:3,fill:color});const title=document.createElementNS(ns,'title');title.textContent=`${name} · round ${i}: ${fmt(v)}`;dot.append(title);});});box.append(svg);
+  names.forEach((name,j)=>{const values=trajectories[name]||[],color=agentColor(j);const points=values.map((v,i)=>Number.isFinite(v)?`${x(i)},${y(v)}`:null).filter(Boolean).join(' ');make('polyline',{points,fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':['','6 4','2 3','9 3 2 3'][j%4]});values.forEach((v,i)=>{if(!Number.isFinite(v))return;const dot=make('circle',{cx:x(i),cy:y(v),r:3,fill:color});const title=document.createElementNS(ns,'title');title.textContent=`${name} · round ${i}: ${fmt(v)}`;dot.append(title);});});box.append(svg);
 }
 
 async function refreshRuns(){
@@ -224,33 +283,28 @@ async function refreshRuns(){
   select.replaceChildren(new Option('Active run (automatic)',''));
   for(const run of [...active,...runs.filter(r=>!active.includes(r))])
    select.add(new Option(active.includes(run)?run+' · running':archived.includes(run)?run+' · archived':run,run));
+  if(selected&&![...select.options].some(o=>o.value===selected))select.add(new Option(selected,selected));
   select.value=selected;
  } catch(e) { /* Status polling reports connection errors. */ }
 }
-refreshRuns();setInterval(refreshRuns,5000);$('saved-run').onchange=()=>{currentRun=null;events=[];poll();};
+refreshRuns();setInterval(refreshRuns,5000);$('saved-run').onchange=()=>{resetConversation($('saved-run').value||null);poll();};
 
-// Synchronous delivery is displayed as one complete round; sequential delivery
-// follows the selected receiver's actual recorded event.
+// Delivery arrows follow the context used by completed responses. Showing a
+// partial synchronous round does not change the scheduler's previous-round inputs.
 function deliveryFrame(records,index,task,settings){
  const event=records[index];
  if(!event||event.task!==task||settings.schedule==='no_peer')return [];
  if(settings.schedule!=='synchronous')return event.row.deliveries||[];
  const round=records.slice(0,index+1).filter(e=>e.task===task&&e.row.round===event.row.round);
- if(new Set(round.map(e=>e.row.agent)).size<settings.agents)return [];
  return round.flatMap(e=>e.row.deliveries||[]);
 }
 
 function responseFrame(records,index,task,settings){
- const event=records[index];if(!event||event.task!==task)return [];
- if(settings.schedule!=='synchronous')return [event.row];
- const rows=records.slice(0,index+1).filter(e=>e.task===task&&e.row.round===event.row.round).map(e=>e.row);
- if(new Set(rows.map(r=>r.agent)).size===settings.agents)return rows;
- // Round still being generated: keep the last complete round visible instead of blank bubbles.
- for(let round=event.row.round-1;round>=0;round--){
-  const previous=records.slice(0,index+1).filter(e=>e.task===task&&e.row.round===round).map(e=>e.row);
-  if(new Set(previous.map(r=>r.agent)).size===settings.agents)return previous;
- }
- return rows;
+ // Show every completed agent response immediately. Synchronous scheduling
+ // governs delivered context, not when a completed response becomes visible.
+ const latest=new Map();
+ for(const event of records.slice(0,index+1))if(event.task===task)latest.set(event.row.agent,event.row);
+ return [...latest.values()];
 }
 
 function syncModels(){
@@ -369,7 +423,10 @@ function renderClosureLog(entries) {
 }
 
 function scenarioLabel(scenario) {
- if(scenario.kind==='binary_question')return scenario.question||scenario.title;
+ if(scenario.kind==='binary_question'){
+  if(scenario.dataset==='proofwriter')return (scenario.question||scenario.title).trim().split('\n').at(-1).replace(/^Based only on these facts and rules, /,'');
+  return scenario.question||scenario.title;
+ }
  const entry=catalog.find(e=>e.data.id===scenario.id);
  const base=entry?entry.path.split('/').pop().replace(/\.json$/,''):(scenario.id||'Scenario').replace(/_\d+$/,'');
  return base.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());

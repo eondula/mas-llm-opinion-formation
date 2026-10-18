@@ -81,6 +81,8 @@ def active_runs():
 def serve(port=8766):
     state={'process':None,'run_id':None}
     lock=threading.Lock()
+    from .live_view import LiveView
+    live_view=LiveView(display_event)
     class Handler(BaseHTTPRequestHandler):
         def send(self, body, content='application/json', status=200):
             body=body if isinstance(body,bytes) else (json.dumps(body).encode() if content=='application/json' else body.encode())
@@ -183,42 +185,32 @@ def serve(port=8766):
                 if parsed.path=='/api/status':
                     scope=parse_qs(parsed.query).get('scope',[None])[0]
                     discovered=[name for name in active_runs() if belongs_to_page(name,scope)]
-                    current=state['run_id'] if belongs_to_page(state['run_id'],scope) else next(iter(discovered),None)
+                    owned=state['run_id'] if belongs_to_page(state['run_id'],scope) else None
+                    # Prefer the latest active worker, including detached workers
+                    # launched from another page or before this dashboard started.
+                    current=jobs.latest(ROOT,discovered) if discovered else None
+                    if current not in discovered and discovered:current=discovered[-1]
+                    if not current:
+                        candidates=[p for p in run_directories(ROOT) if (p/'config.json').is_file() and belongs_to_page(p.name,scope)]
+                        current=max(candidates,key=lambda p:(p/'config.json').stat().st_mtime).name if candidates else owned
                     name=parse_qs(parsed.query).get('run_id',[current])[0]
                     if name and not belongs_to_page(name,scope):
                         return self.send({'error':'Run belongs to a different dashboard page'},status=400)
                     p=run_path(name) if name else None
                     status=json.loads((p/'status.json').read_text()) if p and (p/'status.json').exists() else {'phase':'idle'}
-                    events=[]
-                    closure_events=[]
-                    if p and (p/'events.jsonl').exists():
-                        for line in (p/'events.jsonl').read_text().splitlines():
-                            try:
-                                event = json.loads(line)
-                                if "row" in event: events.append(display_event(event))
-                                if event.get('kind') == 'termination_check' and event.get('policy') == 'agent_closure':
-                                    closure_events.append({k:event.get(k) for k in ('task','round','reason','proposal','unavailable')} | {
-                                        phase:[{k:v.get(k) for k in ('agent','action','reason','valid')} for v in event.get(phase,[])]
-                                        for phase in ('proposals','confirmations')})
-                            except json.JSONDecodeError:pass
+                    events,closure_events=live_view.snapshot(p) if p else ([],[])
                     proc=state['process'] if name==state['run_id'] else None
-                    if p and (p/'conversations').exists():
-                        completed={f.stem:json.loads(f.read_text()) for f in (p/'conversations').glob('*.json')}
-                        events=[e for e in events if e['task'] not in completed]
-                        for task, record in completed.items():
-                            events.extend(display_event(dict(task=task,row=row)) for row in record['rows'])
-                        events.sort(key=lambda e:(e['task'],e['row']['round']))
                     if proc is not None:
                         code=proc.poll()
                         if code is None and status['phase']=='idle':status={'phase':'starting'}
                         elif code is not None and status['phase'] not in ('complete','failed','cancelled'):
-                            log_path=input_path(Path('results/studies/configurations')/f'{name}.log', ROOT)
+                            log_path=(p/'worker.log') if p and (p/'worker.log').exists() else input_path(Path('results/studies/configurations')/f'{name}.log', ROOT)
                             detail=log_path.read_text()[-4000:] if log_path.exists() else ''
                             status=dict(status,phase='failed',error=f'Run process exited with code {code}. '+detail)
                     running = (proc is not None and proc.poll() is None) or name in discovered
                     if running and p and (p/'status.json').exists():
                         status = live_status(status, (p/'status.json').stat().st_mtime)
-                        log_path=input_path(Path('results/studies/configurations')/f'{name}.log', ROOT)
+                        log_path=(p/'worker.log') if p and (p/'worker.log').exists() else input_path(Path('results/studies/configurations')/f'{name}.log', ROOT)
                         if log_path.exists():
                             with log_path.open('rb') as log:
                                 log.seek(max(0, log_path.stat().st_size-2000))
@@ -226,7 +218,7 @@ def serve(port=8766):
                     config=json.loads((p/'config.json').read_text()) if p and (p/'config.json').exists() else None
                     tasks=json.loads((p/'tasks.json').read_text()) if p and (p/'tasks.json').exists() else []
                     evaluation=json.loads((p/'analysis/evaluation.json').read_text()).get('summary') if p and (p/'analysis/evaluation.json').is_file() else None
-                    return self.send(dict(report_available=bool(p and (p/'index.html').exists()),evaluation=evaluation,worker_busy=state['process'] is not None and state['process'].poll() is None,run_id=name,status=status,events=events,closure_events=closure_events,config=config,tasks=tasks,running=(proc is not None and proc.poll() is None) or name in discovered,can_stop=proc is not None and proc.poll() is None))
+                    return self.send(dict(report_available=bool(p and (p/'index.html').exists()),evaluation=evaluation,worker_busy=(state['process'] is not None and state['process'].poll() is None) or bool(discovered),run_id=name,status=status,events=events,closure_events=closure_events,config=config,tasks=tasks,running=(proc is not None and proc.poll() is None) or name in discovered,can_stop=(proc is not None and proc.poll() is None) or bool(p and running and jobs.worker(p) is not None)))
                 assets={'/':('dashboard/study.html','text/html'),'/study.html':('dashboard/study.html','text/html'),'/conversation.html':('dashboard/study.html','text/html'),'/study.js':('dashboard/study.js','text/javascript'),'/study.css':('dashboard/study.css','text/css'),'/styles.css':('dashboard/styles.css','text/css'),'/site.css':('dashboard/site.css','text/css'),'/site.js':('dashboard/site.js','text/javascript'),'/model-controls.js':('dashboard/model-controls.js','text/javascript'),'/experiment.html':('dashboard/experiment.html','text/html'),'/experiment.js':('dashboard/experiment.js','text/javascript'),'/experiment.css':('dashboard/experiment.css','text/css')}
                 if self.path in assets:
                     filename,mime=assets[self.path];return self.send((ROOT/filename).read_bytes(),mime)
@@ -272,12 +264,12 @@ def serve(port=8766):
                         elif not name or not jobs.stop(ROOT/'results/experiments'/name):
                             raise ValueError('No verified active worker is available for this run')
                         return self.send({'stopping':True})
-                    if self.path=='/api/experiment':
+                    if self.path=='/api/experiment' or (self.path=='/api/run' and data.get('dataset')):
                         if proc and proc.poll() is None or active_runs():
                             raise ValueError('An experiment is already active')
                         config=resolve(dict(data,mode='experiment',output_layout='experiment'))
                         if not config.get('dataset'):
-                            raise ValueError('Select StrategyQA for the current experiment workflow')
+                            raise ValueError('Select a supported question dataset for the current experiment workflow')
                         if config.get('pilot_protocol'):
                             from .pilot import assert_lock
                             from .prompts import templates
@@ -317,7 +309,7 @@ def serve(port=8766):
                         state.update(process=process,run_id=name)
                         return self.send({'run_id':name})
                     if self.path=='/api/run':
-                        if proc and proc.poll() is None:raise ValueError('A run is already active')
+                        if proc and proc.poll() is None or active_runs():raise ValueError('A run is already active')
                         config=resolve(data)
                         name=resolve_run_id(config.pop('run_id', None))
                         if run_path(name).exists(): raise ValueError('Run ID already exists; use another ID or resume the saved run')
