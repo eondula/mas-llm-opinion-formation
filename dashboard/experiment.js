@@ -37,7 +37,7 @@ $('pilot-preset').onclick=async()=>{
   $('pilot-device').value=data.config.device;const c=pilotConfig;
   $('composition-matrix').checked=true;$('model-q').value=c.model_configurations[0][0];$('model-s').value=c.model_configurations[1][0];
   for(const name of ['qq','ss','qs','sq'])$('composition-'+name).checked=true;
-  for(const [id,value] of Object.entries({'runs':c.repetitions,'question-count':c.question_count,'agents':c.agents,'agent-configuration':c.agent_configuration,'rounds':c.rounds,'schedule':c.schedule,'initialization':'natural','partition':'train','split':'train','split-seed':42,'question-seed':42,'question-balance':'equal','decoding':c.decoding,'seed':c.seed,'sampling-method':c.sampling_method,'temperature':c.sampling.temperature,'top-p':c.sampling.top_p,'tokens':c.max_argument_tokens,'device':c.device,'question-ids':c.question_ids.join(', ')}))$(id).value=value;
+  for(const [id,value] of Object.entries({'runs':c.repetitions,'question-count':c.question_count,'agents':c.agents,'agent-configuration':c.agent_configuration,'rounds':c.rounds,'schedule':c.schedule,'initialization':'natural','dataset':'strategyqa','partition':'train','split':'train','split-seed':42,'question-seed':42,'question-balance':'equal','decoding':c.decoding,'seed':c.seed,'sampling-method':c.sampling_method,'temperature':c.sampling.temperature,'top-p':c.sampling.top_p,'tokens':c.max_argument_tokens,'device':c.device,'question-ids':c.question_ids.join(', ')}))$(id).value=value;
   $('control').checked=true;$('sentiment').checked=true;$('message-similarity').checked=true;
   starts();modelPicker.render();for(const node of $('agent-models').querySelectorAll('select'))node.value=c.models[0];modelPicker.sync();
   $('pilot-help').textContent='Pilot '+c.device.toUpperCase()+': 10 balanced questions, QQ / SS / QS / SQ, 3 repetitions, 5 updates, natural starts, synchronous + shared-initialization no-peer. 120 pairs; 240 conversations; 2,640 responses with answer-selection and explanation stages. 512-token budget. '+(pilotReady?'Protocol '+data.protocol_hash:pilotMessage);
@@ -73,7 +73,7 @@ function configuration(){
  return {mode:'experiment',output_layout:'experiment',run_id:$('experiment-id').value.trim()||undefined,
   models,agents,agent_configuration,...(model_configurations?{model_configurations}:{}),rounds:Number($('rounds').value),
   repetitions:Number($('runs').value),question_count:Number($('question-count').value),question_ids:ids,question_seed:Number($('question-seed').value),question_balance:$('question-balance')?.value||'random',
-  dataset:{name:'strategyqa',partition:$('partition').value,split:$('split').value,split_seed:Number($('split-seed').value)},
+  dataset:{name:$('dataset').value,partition:$('partition').value,split:$('split').value,split_seed:Number($('split-seed').value)},
   initialization:$('initialization').value==='natural'?'natural':[...$('forced-answers').querySelectorAll('select')].map(node=>Number(node.value)),
   schedule,paired_control:$('control').checked&&schedule!=='no_peer',conditions:$('control').checked&&schedule!=='no_peer'?[{schedule},{schedule:'no_peer'}]:[],
   decoding:$('decoding').value,sampling_method:$('sampling-method').value,seed:Number($('seed').value),
@@ -140,12 +140,12 @@ $('composition-matrix').onchange=compositionControls;compositionControls();
 $('initialization').onchange=starts;$('agents').onchange=()=>{starts();modelPicker.render();};starts();
 async function loadQuestions(){
  const box=$('questions'),selected=new Set([...box.selectedOptions].map(option=>option.value));
- const data=await api('questions?partition='+encodeURIComponent($('partition').value)+'&split='+encodeURIComponent($('split').value)+'&split_seed='+encodeURIComponent($('split-seed').value));
+ const data=await api('questions?dataset='+encodeURIComponent($('dataset').value)+'&partition='+encodeURIComponent($('partition').value)+'&split='+encodeURIComponent($('split').value)+'&split_seed='+encodeURIComponent($('split-seed').value));
  box.replaceChildren(...data.questions.map(question=>{const option=new Option(question.question+' · '+question.id,question.id);option.selected=selected.has(question.id);return option;}));
  $('dataset-help').textContent=data.questions.length+' questions in this split. Leave selection empty to sample the configured count. '+(data.labeled?'Labels are used after simulation only.':'Correctness is unavailable for the official test partition.');
 }
 $('partition').onchange=()=>{$('split').replaceChildren(...($('partition').value==='test'?[['official_test','Official test · unlabeled']]:[['train','Train'],['validation','Validation'],['test','Held-out test'],['all','All']]).map(([value,label])=>new Option(label,value)));loadQuestions().catch(fail);};
-$('split').onchange=()=>loadQuestions().catch(fail);$('split-seed').onchange=()=>loadQuestions().catch(fail);
+$('dataset').onchange=()=>loadQuestions().catch(fail);$('split').onchange=()=>loadQuestions().catch(fail);$('split-seed').onchange=()=>loadQuestions().catch(fail);
 function samplingControls(){
  const sampled=$('decoding').value==='fixed_sampling',method=$('sampling-method').value;
  $('sampling-controls').hidden=!sampled;

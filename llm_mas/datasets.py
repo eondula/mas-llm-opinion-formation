@@ -1,4 +1,4 @@
-"""Pinned StrategyQA loading, safe task construction and question-level splits."""
+"""Pinned StrategyQA and BoolQ loading, safe task construction and question-level splits."""
 import hashlib
 import io
 import json
@@ -21,63 +21,108 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def download(root):
-    folder = Path(root) / 'data/strategyqa'
-    with urllib.request.urlopen(SOURCE_URL, timeout=60) as response:
+def boolq_question(text):
+    # BoolQ questions are lowercase search queries without punctuation.
+    text = ' '.join(text.split())
+    text = text[:1].upper()+text[1:]
+    return text if text.endswith('?') else text+'?'
+
+
+def boolq_partition(archive, partition):
+    """SuperGLUE BoolQ JSONL -> StrategyQA-style records; passages are kept but never shown to agents."""
+    rows = []
+    for line in archive.read(f'BoolQ/{partition}.jsonl').decode().splitlines():
+        item = json.loads(line)
+        row = dict(qid=f'boolq-{partition}-{item["idx"]}', question=boolq_question(item['question']),
+                   source_question=item['question'], passage=item['passage'])
+        if 'label' in item:
+            row['answer'] = item['label']
+        rows.append(row)
+    return json.dumps(rows, ensure_ascii=False, separators=(',', ':')).encode()
+
+
+# SuperGLUE v2 release of BoolQ (Clark et al., 2019); the original storage.googleapis.com/boolq files are no longer public.
+DATASETS = {
+    'strategyqa': dict(label='StrategyQA', source_url=SOURCE_URL, release_sha256=RELEASE_SHA256, partition_sha256=PARTITION_SHA256,
+                       extract=lambda archive, partition: archive.read(f'strategyqa_{partition}.json')),
+    'boolq': dict(label='BoolQ', source_url='https://dl.fbaipublicfiles.com/glue/superglue/data/v2/BoolQ.zip',
+                  release_sha256='853fbe7922f70c59629f06a39e8d9ca440c3d740e760fd3b87a5ddf3dcba2436',
+                  partition_sha256={'train': 'f0ba5ec63c4621c499b2d9725a7d2e7bf07977681ddb189d3f388abaa65a9a90', 'test': '08eee1227567396a0fedfd532a088037318406e0972ca2599c531ae38953f463'}, extract=boolq_partition),
+}
+
+
+def source(name):
+    if name not in DATASETS:
+        raise ValueError('Unsupported dataset')
+    return DATASETS[name]
+
+
+def download(root, name='strategyqa'):
+    spec = source(name)
+    folder = Path(root) / 'data' / name
+    context = None
+    try:
+        # Python.org macOS builds ship without CA certificates; certifi is a pinned requirement.
+        import certifi, ssl
+        context = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        pass
+    with urllib.request.urlopen(spec['source_url'], timeout=60, context=context) as response:
         payload = response.read()
-    if sha(payload) != RELEASE_SHA256:
-        raise ValueError('StrategyQA release checksum changed; inspect before updating the pinned release')
+    if sha(payload) != spec['release_sha256']:
+        raise ValueError(f'{spec["label"]} release checksum changed; inspect before updating the pinned release')
     folder.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         for partition in ('train', 'test'):
-            name = f'strategyqa_{partition}.json'
-            data = archive.read(name)
+            filename = f'{name}_{partition}.json'
+            data = spec['extract'](archive, partition)
             # Validate before replacing an installed dataset file.
-            validate_records(json.loads(data), partition)
-            temporary = folder / (name + '.tmp')
+            validate_records(json.loads(data), partition, spec['label'])
+            temporary = folder / (filename + '.tmp')
             temporary.write_bytes(data)
-            temporary.replace(folder / name)
-    return describe(root)
+            temporary.replace(folder / filename)
+    return describe(root, name=name)
 
 
-def validate_records(records, partition):
+def validate_records(records, partition, label='StrategyQA'):
     if not isinstance(records, list) or not records:
-        raise ValueError('StrategyQA partition must be a nonempty JSON list')
+        raise ValueError(f'{label} partition must be a nonempty JSON list')
     ids = set()
     for row in records:
         if not isinstance(row, dict) or any(not isinstance(row.get(key), str) or not row[key].strip()
                                             for key in ('qid', 'question')):
-            raise ValueError('StrategyQA rows require nonempty qid and question strings')
+            raise ValueError(f'{label} rows require nonempty qid and question strings')
         if row['qid'] in ids:
-            raise ValueError('Duplicate StrategyQA question ID: ' + row['qid'])
+            raise ValueError(f'Duplicate {label} question ID: ' + row['qid'])
         ids.add(row['qid'])
         if 'answer' in row and type(row['answer']) is not bool:
-            raise ValueError('StrategyQA answer labels must be Boolean')
+            raise ValueError(f'{label} answer labels must be Boolean')
         if partition == 'train' and 'answer' not in row:
-            raise ValueError('The labeled StrategyQA train pool requires an answer for every question')
+            raise ValueError(f'The labeled {label} train pool requires an answer for every question')
 
 
 def load(root, spec=None):
     spec = dict(spec or {})
-    if spec.get('name', 'strategyqa') != 'strategyqa':
-        raise ValueError('Unsupported dataset')
+    name = spec.get('name', 'strategyqa')
+    pinned = source(name)
+    label = pinned['label']
     partition = spec.get('partition', 'train')
     if partition not in ('train', 'test'):
-        raise ValueError('StrategyQA source partition must be train or test')
-    folder = Path(spec.get('path', 'data/strategyqa'))
+        raise ValueError(f'{label} source partition must be train or test')
+    folder = Path(spec.get('path', f'data/{name}'))
     if not folder.is_absolute():
         folder = Path(root) / folder
-    file = folder / f'strategyqa_{partition}.json'
+    file = folder / f'{name}_{partition}.json'
     if not file.is_file():
-        raise ValueError('StrategyQA is not installed. Run: python -m llm_mas dataset download')
+        raise ValueError(f'{label} is not installed. Run: python -m llm_mas dataset download --name {name}')
     data = file.read_bytes()
     if spec.get('source_sha256') and spec['source_sha256'] != sha(data):
-        raise ValueError('StrategyQA file changed since the saved configuration')
+        raise ValueError(f'{label} file changed since the saved configuration')
     rows = json.loads(data)
-    validate_records(rows, partition)
-    metadata = dict(name='strategyqa', path=str(folder.relative_to(root)) if folder.is_relative_to(root) else str(folder),
-                    partition=partition, source_url=SOURCE_URL, release_sha256=RELEASE_SHA256,
-                    source_sha256=sha(data), release_verified=sha(data) == PARTITION_SHA256[partition],
+    validate_records(rows, partition, label)
+    metadata = dict(name=name, path=str(folder.relative_to(root)) if folder.is_relative_to(root) else str(folder),
+                    partition=partition, source_url=pinned['source_url'], release_sha256=pinned['release_sha256'],
+                    source_sha256=sha(data), release_verified=sha(data) == pinned['partition_sha256'][partition],
                     split_version=SPLIT_VERSION)
     return rows, metadata
 
@@ -138,7 +183,7 @@ def select(root, raw):
     if balance=='equal' and sum(r['answer'] for r in selected)*2!=len(selected):
         raise ValueError('Explicit question IDs must have equal Yes/No labels')
     metadata.update(split=split, split_seed=split_seed)
-    tasks = [question_task(row['qid'], row['question']) for row in selected]
+    tasks = [question_task(row['qid'], row['question'], metadata['name']) for row in selected]
     return tasks, metadata, assignments
 
 
@@ -148,8 +193,8 @@ def labels(root, spec):
     return {row['qid']: 'Yes' if row['answer'] else 'No' for row in rows if 'answer' in row}
 
 
-def describe(root, partition='train', split='train', split_seed=42):
-    rows, metadata = load(root, dict(partition=partition))
+def describe(root, partition='train', split='train', split_seed=42, name='strategyqa'):
+    rows, metadata = load(root, dict(name=name, partition=partition))
     assignments = split_assignments(rows, split_seed, partition)
     return dict(metadata=metadata, labeled=sum('answer' in r for r in rows), total=len(rows),
                 splits={s: sum(value == s for value in assignments.values()) for s in sorted(set(assignments.values()))},

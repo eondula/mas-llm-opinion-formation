@@ -169,7 +169,8 @@ def serve(port=8766):
                     from .datasets import describe
                     query=parse_qs(parsed.query)
                     return self.send(describe(ROOT,query.get('partition',['train'])[0],
-                                              query.get('split',['train'])[0],int(query.get('split_seed',['42'])[0])))
+                                              query.get('split',['train'])[0],int(query.get('split_seed',['42'])[0]),
+                                              query.get('dataset',['strategyqa'])[0]))
                 if parsed.path=='/api/scenarios':
                     entries=[]
                     if parse_qs(parsed.query).get('archived') != ['1']:

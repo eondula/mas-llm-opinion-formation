@@ -8,8 +8,9 @@ def main():
     sub=p.add_subparsers(dest='command',required=True)
     pilot_freeze=sub.add_parser('pilot-freeze',help='Freeze the reviewed pilot on this machine')
     pilot_freeze.add_argument('--device',choices=['mps','cuda'],default='mps')
-    dataset=sub.add_parser('dataset', help='Prepare or inspect StrategyQA data')
+    dataset=sub.add_parser('dataset', help='Prepare or inspect StrategyQA or BoolQ data')
     dataset.add_argument('action', choices=['download','info'])
+    dataset.add_argument('--name', choices=['strategyqa','boolq'], default='strategyqa')
     preview=sub.add_parser('preview')
     preview.add_argument('--prompt-style',choices=['original','open_discussion','topic_discussion','discussion_then_decision'],default='original')
     preview.add_argument('--model',default=DEFAULT_MODEL)
@@ -54,7 +55,7 @@ def main():
         print(json.dumps(freeze(device=args.device),indent=2));return
     if args.command=='dataset':
         from .datasets import download, describe
-        info=download(ROOT) if args.action=='download' else describe(ROOT)
+        info=download(ROOT,args.name) if args.action=='download' else describe(ROOT,name=args.name)
         print(json.dumps({key:value for key,value in info.items() if key!='questions'},indent=2))
         return
     if args.command=='question-figures':
