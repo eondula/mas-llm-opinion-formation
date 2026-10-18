@@ -46,7 +46,8 @@ class QuestionResponsePolicy:
             turn = (self.texts['qa_turn_forced_v3'].format(rounds=rounds, answer='Yes' if self.config['initialization'][i] == 1 else 'No') if forced else
                     self.texts['qa_turn_initial_v3'].format(rounds=rounds) if t == 0 else
                     self.texts['qa_turn_update_v3'].format(round=t, rounds=rounds))
-            return self.texts['qa_response_reasoning'].format(turn_instruction=turn.rstrip('\n'))
+            closing = self.texts['qa_closing_initial' if t == 0 else 'qa_closing_update'].strip()
+            return self.texts['qa_response_reasoning'].format(turn_instruction=turn.rstrip('\n'), closing=closing)
         if forced:
             answer = 'Yes' if self.config['initialization'][i] == 1 else 'No'
             turn = (f'No peer has spoken yet. Your assigned initial answer is {answer}. '
@@ -81,7 +82,8 @@ class QuestionResponsePolicy:
             own=[m['content'] for m in history if m['role']=='assistant']
             exempt=[m['content'] for m in history[:2]]+[prompt]
             result=runtime.generate_reasoning_response(history+[dict(role='user',content=prompt)],
-                self.config['max_argument_tokens'],own,exempt,self.config['copy_block_ngram'],sampling=options.get('sampling'),assigned=assigned)
+                self.config['max_argument_tokens'],own,exempt,self.config['copy_block_ngram'],sampling=options.get('sampling'),assigned=assigned,
+                next_choice=t > 0)
             answer,argument,status=result['answer'],result['argument'],'valid'
             generation=result['generation'];generation['instruction']=prompt
             decision_time=result['measurement'];decision=decision_time
@@ -113,4 +115,6 @@ class QuestionResponsePolicy:
                     strategy=1 if answer == 'Yes' else 2 if answer == 'No' else None,
                     choice_status=status, decision_time=decision_time, stance_source='decision_time' if decision_time else 'post_response_probe', pre_response_probe=pre_response_probe, forced=forced, assigned_initial_answer=assigned, before=before, decision=decision, post=post,
                     message=message, argument=argument, generation=generation,
+                    next_action=result.get('next_action') if self.v3 else None,
+                    next_choice=result.get('next_measurement') if self.v3 else None,
                     deliveries=deliveries, decision_history=decision_history, history=deepcopy(history))

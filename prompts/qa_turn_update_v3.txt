@@ -1,5 +1,6 @@
-Round {round} of {rounds}.
-Write 2–3 sentences. Do not repeat reasons you gave in earlier rounds.
-- If a message from another agent appears above: name the agent, state the specific claim you are responding to, and say whether it is correct and why.
-- If no message from another agent appears above: examine one fact or assumption in your earlier reasoning and say whether it holds.
-Then add one relevant consideration you have not mentioned before, or say in one sentence that you have nothing new to add.
+Round {round} of up to {rounds}.
+Write 2–3 sentences in your own words. Do not restate the question, the facts, or earlier messages.
+- If a message from another agent appears above and you disagree with a claim in it: name the agent, quote the claim in a few words, and explain why it is wrong.
+- If a message from another agent appears above and you agree: give the one reason you find decisive.
+- If no message from another agent appears above: check the step your answer depends on most and say whether it holds.
+If you have a question or an unchecked step that could change an answer, ask or state it.

@@ -6,7 +6,8 @@ Run from the project root:
     .venv/bin/python large_model_experiment/run_experiment.py --dry-run                     # print the plan and first prompt
     .venv/bin/python large_model_experiment/run_experiment.py --report-only --run-id claude_openai_1
 
-Design (mirrors results/experiments/pilot_experiment_2): 2 agents, 5 update rounds, natural starts,
+Design (mirrors results/experiments/pilot_experiment_2): 2 agents, up to 5 update rounds (agents end the
+discussion with their "Next: finish" line; the no-peer control runs as many rounds as its peer conversation), natural starts,
 compositions CC / OO / CO / OC, synchronous peer exchange vs matched no-peer control sharing the
 same round-0 responses, the 4 StrategyQA questions. Differences from the local pipeline, all
 forced by the APIs: no answer-token logits (no stance), the answer is the "Answer: Yes/No" line the
@@ -17,6 +18,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import sys
 import threading
 import traceback
@@ -106,11 +108,16 @@ class Experiment:
         answer = parsed['stated_answer']
         status = 'refusal' if result['refusal'] else 'valid' if answer else 'no_answer_line'
         reasoning = parsed['reasoning']
+        # Rounds 1+: the model states Next: continue/finish after its answer (no logits through the API).
+        found = re.search(r'(?im)^[\s*_>-]*next\s*[*_]*\s*:\s*[*_]*\s*(continue|finish)\b', result['text']) if t > 0 else None
+        next_action = found.group(1).lower() if found else None
         message = (reasoning+'\n' if reasoning else '')+'Answer: '+answer if status == 'valid' else result['text']
+        if status == 'valid' and next_action:
+            message += '\nNext: '+next_action
         history.append(dict(role='assistant', content=message))
         with self.lock:
             self.completed += 1
-        print(f'  {names[i]} {models[i]} r{t}: {answer or status}')
+        print(f'  {names[i]} {models[i]} r{t}: {answer or status}{" · next "+next_action if next_action else ""}')
         empty = dict(stance=None, margin=None)
         return dict(response_id=f'r{t}_a{i}', question_id=policy.task['id'], round=t, agent=names[i], model=models[i],
                     answer=answer if status == 'valid' else None, strategy=1 if answer == 'Yes' else 2 if answer == 'No' else None,
@@ -119,9 +126,10 @@ class Experiment:
                     generation=dict(result, instruction=prompt, raw_output=result['text'], answer_marker_found=parsed['marker_found'],
                                     answer_before_reasoning=parsed['answer_before_reasoning'], reasoning=reasoning,
                                     choice_parser_version='stated-answer-line-v1'),
+                    next_action=next_action, next_choice=dict(method='stated-next-line-v1', selected_action=next_action) if t > 0 else None,
                     deliveries=deliveries, decision_history=decision_history, history=deepcopy(history))
 
-    def converse(self, task, models, schedule, rounds, initial_rows=None):
+    def converse(self, task, models, schedule, rounds, initial_rows=None, yoked_rounds=None):
         names = names_for(2)
         policy = self.policy(task, models)
         histories = [policy.initial(i) for i in range(2)]
@@ -146,6 +154,21 @@ class Experiment:
                 row = self.respond(policy, histories[i], t, i, deliveries, models, names)
                 latest[i] = row
                 rows.append(row)
+            if t >= 1:
+                # Same rule as llm_mas/engine.py (agent_signal): stop when every agent states finish, or at the budget;
+                # the no-peer control runs as many rounds as its matched peer conversation.
+                current = rows[-2:]
+                if yoked_rounds is not None:
+                    reason = 'yoked_to_peer_branch' if t >= yoked_rounds else None
+                else:
+                    reason = ('agents_finished' if all(r['next_action'] == 'finish' for r in current)
+                              else 'budget_exhausted' if t == rounds else None)
+                termination = dict(round=t, policy='agent_signal', reason=reason, next_actions={r['agent']: r['next_action'] for r in current},
+                                   **({'yoked_rounds': yoked_rounds} if yoked_rounds is not None else {}))
+                for row in current:
+                    row['termination'] = termination
+                if reason:
+                    break
         return rows
 
     def pair(self, ci, models, qi, task, protocol_hash):
@@ -166,11 +189,12 @@ class Experiment:
             if target.exists():
                 continue
             print(f'[{task["id"]}] {"/".join(models)}: {schedule}')
-            rows = self.converse(task, models, schedule, self.config['rounds'], initial_rows=snapshot['rows'])
+            yoked = read(targets['synchronous'])['termination']['round'] if schedule == 'no_peer' else None
+            rows = self.converse(task, models, schedule, self.config['rounds'], initial_rows=snapshot['rows'], yoked_rounds=yoked)
             record = dict(schema_version=SCHEMA_VERSION, config=dict(self.config, models=list(models), schedule=schedule),
                           scenario=task, question_id=task['id'], repetition=0,
                           measurement_stages=dict(before='none', decision='stated_answer_line_after_reasoning', post='none', primary='explicit_answer'),
-                          rows=rows, termination=dict(reason='max_rounds', round=self.config['rounds'], policy='fixed'),
+                          rows=rows, termination=rows[-1].get('termination'),
                           pair_id=pair_id, initialization_hash=snapshot['initialization_hash'], control_design='shared_initialization',
                           protocol_hash=protocol_hash, task=task, dataset=self.config['dataset'],
                           research_split=self.config['research_splits'][task['id']])
@@ -261,7 +285,7 @@ def main():
                   paired_control=True, conditions=[dict(schedule='synchronous'), dict(schedule='no_peer')],
                   model_configurations=compositions, agent_configuration='heterogeneous', response_protocol=PROTOCOL,
                   copy_block_ngram=0, max_argument_tokens=int(env('MAX_OUTPUT_TOKENS', '4096')), sentiment=True, message_similarity=True,
-                  question_figure_profile='question_png', stopping='fixed', prompt_style='question', argument_mode='combined_reasoning',
+                  question_figure_profile='question_png', stopping='agent_signal', prompt_style='question', argument_mode='combined_reasoning',
                   decision_mode='generated', dataset=dataset, tasks=tasks, scenarios=tasks,
                   research_splits={t['id']: assignments[t['id']] for t in tasks}, mock=args.mock)
     texts = templates()

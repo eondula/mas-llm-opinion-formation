@@ -119,6 +119,7 @@ def execute(raw, name=None, resume=False, launch_token=None):
                     done += count
                     if not config.get('paired_control'):generated_done+=count
                     total -= (active['rounds']+1)*active['agents'] - count
+                    generation_total -= (active['rounds']+1)*active['agents'] - count
                     continue
                 if config.get('pilot_protocol'):
                     assert_lock(config,texts)
@@ -138,6 +139,15 @@ def execute(raw, name=None, resume=False, launch_token=None):
                 execution = dict(active)
                 if active.get('repetitions', 1) > 1:
                     execution['seed_offset'] += si * (active['rounds'] + 1) * active['agents']
+                if config.get('paired_control') and active['schedule'] == 'no_peer' and active.get('stopping') == 'agent_signal':
+                    # The matched peer conversation runs first; its stop round sets the control's length.
+                    partner = next((pi for pi, c in enumerate(tasks) if c['schedule'] != 'no_peer' and c['models'] == active['models']
+                                    and c['agents'] == active['agents'] and c.get('repetition', 0) == active.get('repetition', 0)
+                                    and c['initialization'] == active['initialization']), None)
+                    source = path/'conversations'/f'{partner:03d}_{si:03d}.json' if partner is not None else None
+                    if source is None or not source.exists():
+                        raise ValueError('The no-peer control needs its matched peer conversation to finish first')
+                    execution['yoked_rounds'] = read_conversation(source)['termination']['round']
                 snapshot=None
                 if config.get('paired_control'):
                     from .pilot import shared_initialization
@@ -152,6 +162,7 @@ def execute(raw, name=None, resume=False, launch_token=None):
                     snapshot=shared_initialization(path,execution,scenario,texts,runtimes,protocol_hash,initial_progress)
                 rows = conversation(execution, scenario, texts, runtimes, emit,**({'initial_rows':snapshot['rows']} if snapshot else {}))
                 total -= (active['rounds']+1)*active['agents'] - len(rows)
+                generation_total -= (active['rounds']+1)*active['agents'] - len(rows)
                 termination = rows[-1].get('termination')
                 if active.get('observe_stopping'):
                     triggers = [r['round'] for r in rows if (r.get('termination') or {}).get('reason') == 'system_detected_stability']

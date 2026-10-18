@@ -108,5 +108,6 @@ class MockAgent:
         peers = [m['content'] for m in messages if m['role'] == 'user' and m['content'].startswith('Message from')]
         answer = self.lean if rounds % 3 != 2 else ('No' if self.lean == 'Yes' else 'Yes')
         reply = f'Round {rounds}: {"responding to " + peers[-1].split(" (")[0][13:] if peers else "re-checking my reasoning"}; mock agent {self.model} considers the question.'
-        return dict(text=f'{reply}\nAnswer: {answer}', stop_reason='end_turn', model_returned=self.model, response_id=None,
+        closing = '' if rounds == 0 else '\nNext: '+('finish' if rounds >= 2 else 'continue')
+        return dict(text=f'{reply}\nAnswer: {answer}{closing}', stop_reason='end_turn', model_returned=self.model, response_id=None,
                     refusal=False, truncated=False, latency_seconds=0., usage=None, request_parameters={})

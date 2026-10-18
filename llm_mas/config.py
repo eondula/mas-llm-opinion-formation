@@ -55,7 +55,7 @@ def resolve(raw, planned=False):
             raise ValueError('StrategyQA uses the unified experiment protocol, not historical joint/exploration modes')
         tasks, dataset, _ = select(ROOT, raw)
         required = dict(decision_mode='generated',
-                        argument_mode='combined_reasoning', prompt_style='question', stopping='fixed')
+                        argument_mode='combined_reasoning', prompt_style='question')
         for key, value in required.items():
             if key in raw and raw[key] != value:
                 raise ValueError(f'StrategyQA requires {key}={value}')
@@ -65,7 +65,16 @@ def resolve(raw, planned=False):
             raise ValueError('Historical personas, argument probes, joint tasks and exporters are not StrategyQA protocols')
         raw=dict(raw)
         raw.setdefault('response_protocol','legacy_json' if raw.get('pilot_protocol','').startswith('strategyqa-pilot-v4-') else 'reasoning_answer_v3')
-        if raw['response_protocol']=='reasoning_answer_v3':raw.setdefault('copy_block_ngram',6)
+        if raw['response_protocol']=='reasoning_answer_v3':
+            # Agents end the conversation with their structured Next: line; rounds is the budget.
+            raw.setdefault('copy_block_ngram',0)
+            raw.setdefault('stopping','agent_signal')
+            raw.setdefault('max_argument_tokens',256)
+        raw.setdefault('stopping','fixed')
+        if raw['stopping'] not in ('fixed','agent_signal'):
+            raise ValueError('Dataset experiments use fixed rounds or agent_signal stopping')
+        if raw['stopping']=='agent_signal' and raw['response_protocol']!='reasoning_answer_v3':
+            raise ValueError('agent_signal stopping requires the reasoning_answer_v3 protocol')
         raw.setdefault('question_figure_profile','question_png')
         raw.setdefault('max_argument_tokens',512)
         raw = dict(raw, **required, dataset=dataset, tasks=tasks, scenarios=tasks,
@@ -174,7 +183,7 @@ def resolve(raw, planned=False):
             candidate=input_path(Path('scenarios/study')/f'{name}.json')
             enriched.append(str(candidate) if name in ('sensor','storage') and candidate.exists() else value)
         c['scenarios']=enriched
-    if c.get('stopping', 'fixed') not in ('fixed', 'exact_repetition', 'cosine_similarity', 'combined_stability', 'sign_stability', 'agent_closure'):
+    if c.get('stopping', 'fixed') not in ('fixed', 'exact_repetition', 'cosine_similarity', 'combined_stability', 'sign_stability', 'agent_closure', 'agent_signal'):
         raise ValueError('Invalid stopping policy')
     if c.get('stopping') in ('exact_repetition', 'cosine_similarity', 'combined_stability', 'sign_stability') and c.get('export_profile') in ('experiment_c', 'experiment_d'):
         raise ValueError('Adaptive stopping requires the generic figure exporter')
@@ -291,8 +300,9 @@ def resolve(raw, planned=False):
                     raise ValueError('Evidence IDs must be unique')
     if type(c.get('paired_control',False)) is not bool:raise ValueError('paired_control must be boolean')
     if c.get('paired_control') and not planned:
-        if not c.get('dataset') or c['stopping']!='fixed' or len(c['conditions'])!=2 or {v.get('schedule') for v in c['conditions']}!={c['schedule'],'no_peer'} or c['schedule']=='no_peer':
-            raise ValueError('Paired controls require one peer branch and one no-peer branch with fixed horizon')
+        # agent_signal is allowed: the no-peer branch is run for as many rounds as its matched peer branch.
+        if not c.get('dataset') or c['stopping'] not in ('fixed','agent_signal') or len(c['conditions'])!=2 or {v.get('schedule') for v in c['conditions']}!={c['schedule'],'no_peer'} or c['schedule']=='no_peer':
+            raise ValueError('Paired controls require one peer branch and one no-peer branch with fixed rounds or agent_signal stopping')
     if c.get('pilot_protocol'):
         from .pilot import paths,validate
         paths(c['pilot_protocol'])

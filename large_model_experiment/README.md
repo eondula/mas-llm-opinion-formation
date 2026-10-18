@@ -3,7 +3,8 @@
 Same design as `results/experiments/pilot_experiment_2`, with API models as the two agents:
 
 - `reasoning_answer_v3` prompts (option A), loaded from `prompts/`
-- 2 agents, 5 update rounds, natural starts
+- 2 agents, up to 5 update rounds: from round 1 each response ends with `Next: continue` or `Next: finish`, and the conversation stops once both agents say finish. The no-peer control runs as many rounds as its matched peer conversation.
+- natural starts
 - compositions CC / OO / CO / OC (C = Claude, O = OpenAI)
 - synchronous peer exchange vs a matched no-peer control that shares the same round-0 responses
 - the same 4 StrategyQA questions

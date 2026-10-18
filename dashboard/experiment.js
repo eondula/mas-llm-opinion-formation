@@ -37,7 +37,7 @@ $('pilot-preset').onclick=async()=>{
   $('pilot-device').value=data.config.device;const c=pilotConfig;
   $('composition-matrix').checked=true;$('model-q').value=c.model_configurations[0][0];$('model-s').value=c.model_configurations[1][0];
   for(const name of ['qq','ss','qs','sq'])$('composition-'+name).checked=true;
-  for(const [id,value] of Object.entries({'runs':c.repetitions,'question-count':c.question_count,'agents':c.agents,'agent-configuration':c.agent_configuration,'rounds':c.rounds,'schedule':c.schedule,'initialization':'natural','dataset':'strategyqa','partition':'train','split':'train','split-seed':42,'question-seed':42,'question-balance':'equal','decoding':c.decoding,'seed':c.seed,'sampling-method':c.sampling_method,'temperature':c.sampling.temperature,'top-p':c.sampling.top_p,'tokens':c.max_argument_tokens,'device':c.device,'question-ids':c.question_ids.join(', ')}))$(id).value=value;
+  for(const [id,value] of Object.entries({'runs':c.repetitions,'question-count':c.question_count,'agents':c.agents,'agent-configuration':c.agent_configuration,'rounds':c.rounds,'schedule':c.schedule,'initialization':'natural','dataset':'strategyqa','partition':'train','split':'train','split-seed':42,'question-seed':42,'question-balance':'equal','decoding':c.decoding,'seed':c.seed,'sampling-method':c.sampling_method,'temperature':c.sampling.temperature,'top-p':c.sampling.top_p,'tokens':c.max_argument_tokens,'stopping':c.stopping||'fixed','device':c.device,'question-ids':c.question_ids.join(', ')}))$(id).value=value;
   $('control').checked=true;$('sentiment').checked=true;$('message-similarity').checked=true;
   datasetControls();starts();modelPicker.render();for(const node of $('agent-models').querySelectorAll('select'))node.value=c.models[0];modelPicker.sync();
   $('pilot-help').textContent='Pilot '+c.device.toUpperCase()+': 10 balanced questions, QQ / SS / QS / SQ, 3 repetitions, 5 updates, natural starts, synchronous + shared-initialization no-peer. 120 pairs; 240 conversations; 2,640 responses with answer-selection and explanation stages. 512-token budget. '+(pilotReady?'Protocol '+data.protocol_hash:pilotMessage);
@@ -46,7 +46,7 @@ $('pilot-preset').onclick=async()=>{
 };
 $('custom-preset').onclick=()=>{
  pilotLoadId++;pilotConfig=null;pilotReady=false;pilotRequested=false;pilotMessage='';
- for(const [id,value] of Object.entries({'runs':3,'question-count':10,'agents':2,'rounds':5,'schedule':'synchronous','initialization':'natural','partition':'train','split-seed':42,'question-seed':42,'question-balance':'equal','decoding':'fixed_sampling','seed':42,'sampling-method':'combined','temperature':0.7,'top-p':0.9,'tokens':512,'question-ids':''}))$(id).value=value;
+ for(const [id,value] of Object.entries({'runs':3,'question-count':10,'agents':2,'rounds':5,'schedule':'synchronous','initialization':'natural','partition':'train','split-seed':42,'question-seed':42,'question-balance':'equal','stopping':'agent_signal','decoding':'fixed_sampling','seed':42,'sampling-method':'combined','temperature':0.7,'top-p':0.9,'tokens':256,'question-ids':''}))$(id).value=value;
  $('split').replaceChildren(...[['train','Train'],['validation','Validation'],['test','Held-out test'],['all','All']].map(([value,label])=>new Option(label,value)));
  for(const option of $('questions').options)option.selected=false;
  $('composition-matrix').checked=true;for(const name of ['qq','ss','qs','sq'])$('composition-'+name).checked=true;
@@ -78,7 +78,7 @@ function configuration(){
   schedule,paired_control:$('control').checked&&schedule!=='no_peer',conditions:$('control').checked&&schedule!=='no_peer'?[{schedule},{schedule:'no_peer'}]:[],
   decoding:$('decoding').value,sampling_method:$('sampling-method').value,seed:Number($('seed').value),
   sampling:{temperature:Number($('temperature').value),top_p:Number($('top-p').value),seed:Number($('seed').value)},
-  max_argument_tokens:Number($('tokens').value),message_similarity:$('message-similarity').checked,device:$('device').value,sentiment:$('sentiment').checked};
+  max_argument_tokens:Number($('tokens').value),stopping:$('stopping').value,message_similarity:$('message-similarity').checked,device:$('device').value,sentiment:$('sentiment').checked};
 }
 function compositionControls(){
  const matrix=$('composition-matrix').checked;

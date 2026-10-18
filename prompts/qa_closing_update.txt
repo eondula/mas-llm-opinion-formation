@@ -1,0 +1,4 @@
+End with exactly two lines:
+Answer: Yes  (or Answer: No)
+Next: continue  (or Next: finish)
+Choose continue only if your message raises a question, an objection, or an unchecked step that still needs a reply. Otherwise choose finish.

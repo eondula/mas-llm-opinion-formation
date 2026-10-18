@@ -1,2 +1,2 @@
-Round 0 of {rounds}. No other agent has spoken yet.
-Write 2–3 sentences of reasoning about the question.
+Round 0 of up to {rounds}. No other agent has spoken yet.
+In 2–3 sentences, give the main reason for your answer. If the answer depends on a chain of steps, state the step it depends on most.

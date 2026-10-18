@@ -29,6 +29,16 @@ def number(value):
     return value if isinstance(value, (int, float)) and math.isfinite(value) else None
 
 
+def ngram_overlap(text, other, n=5):
+    """Share of the message's word n-grams that also occur in another message (repetition/copying)."""
+    import re
+    def grams(value):
+        words = re.findall(r"[a-z0-9']+", (value or '').lower())
+        return {tuple(words[i:i+n]) for i in range(len(words)-n+1)}
+    own = grams(text)
+    return len(own & grams(other))/len(own) if own and other is not None else None
+
+
 def delta(a, b):
     return a-b if a is not None and b is not None else None
 
@@ -136,6 +146,10 @@ def analyze(path, tolerance=0.01):
                              matches_peer_majority=row['answer'] == peer_majority if valid and peer_majority else None,
                              delivery_stance_change=delta(number(row.get('decision',{}).get('stance')),number(row.get('before',{}).get('stance'))),
                              response_stance_change=delta(stance,number(row.get('decision',{}).get('stance'))))
+                choice = row.get('next_choice') or {}
+                point.update(next_action=row.get('next_action'), next_stance=number(choice.get('stance')),
+                             own_previous_overlap=ngram_overlap(row.get('argument'), previous.get('argument')) if previous else None,
+                             peer_previous_overlap=max([ngram_overlap(row.get('argument'), s.get('argument')) for s in sources], default=None) if sources else None)
                 local.append(point); turns.append(point)
                 previous = row
                 previous_direction = direction
@@ -182,7 +196,10 @@ def analyze(path, tolerance=0.01):
                        stance_range=max(values)-min(values) if len(values)==config['agents'] else None)
             local_groups.append(group)
         first_consensus=next((r['round'] for r in local_groups if r['consensus']),None)
+        termination=record.get('termination') or {}
         for group in local_groups:
+            group['stop_reason']=termination.get('reason')
+            group['rounds_used']=rounds[-1]
             group['first_consensus_round']=first_consensus
             group['first_consensus_correct']=next((r['consensus_correct'] for r in local_groups if r['consensus']),None)
             groups.append(group)
@@ -225,6 +242,11 @@ def analyze(path, tolerance=0.01):
                               mean_final_initial_message_cosine=average([r['final_initial_message_cosine'] for r in ats]),
                               stable_update_fraction=fraction([r['stable'] for r in ts]),
                               repeated_arguments=sum(r['repeated_arguments'] for r in ats),
+                              agents_finished_rate=fraction([r['stop_reason']=='agents_finished' for r in finals]) if any(r['stop_reason'] for r in finals) else None,
+                              mean_rounds_used=average([r['rounds_used'] for r in finals]),
+                              finish_signal_rate=fraction([r['next_action']=='finish' for r in ts if r['next_action']]),
+                              mean_own_previous_overlap=average([r['own_previous_overlap'] for r in ts]),
+                              mean_peer_previous_overlap=average([r['peer_previous_overlap'] for r in ts]),
                               mean_peer_distance_reduction=average([r['peer_distance_reduction'] for r in ts]),
                               mean_movement_toward_peers=average([r['movement_toward_peers'] for r in ts])))
     analysis=path/'analysis'
@@ -236,6 +258,8 @@ def analyze(path, tolerance=0.01):
                      consensus='All configured agents have valid identical answers; undefined for a single agent',
                      peer_movement='Descriptive association with source-row primary stance (decision-time when recorded, legacy post-response otherwise) for messages actually delivered; not causal influence',
                      oscillation='Sign reversal between consecutive stance updates exceeding the stability tolerance; flat updates break the sequence',
+                     stopping='agent_signal: a conversation ends after the first update round in which every agent states Next: finish, or at the round budget; no-peer controls run as many rounds as their matched peer conversation. next_stance > 0 favors finish.',
+                     repetition='own_previous_overlap / peer_previous_overlap: share of a message\'s word 5-grams also present in the agent\'s previous message / the delivered peer message',
                      missing_values='Null means unavailable or inapplicable; invalid outputs are not replaced with scored answers')
     write(analysis/'behavioral.json',dict(definitions=definitions,summary=summaries,turns=turns,agents=agents,groups=groups))
     write(path/'summary.json',dict(definitions=definitions,rows=summaries))

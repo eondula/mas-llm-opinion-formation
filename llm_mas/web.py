@@ -35,7 +35,7 @@ def belongs_to_page(name, scope):
 def display_event(event):
     """Send only fields used by dashboard playback; raw results stay on disk."""
     row=event['row']
-    small={k:row[k] for k in ('round','agent','model','strategy','answer','correct','question_id','forced','message','argument','sentiment','deliveries','choice_status','response_id','forced_assignment','forced_compliance','argument_id') if k in row}
+    small={k:row[k] for k in ('round','agent','model','strategy','answer','correct','question_id','forced','message','argument','sentiment','deliveries','choice_status','response_id','forced_assignment','forced_compliance','argument_id','next_action','termination') if k in row}
     from .choice_output import display_message
     small['display_message'] = display_message(row)
     small['post']={k:row.get('post',{}).get(k) for k in ('stance','margin') if k in row.get('post',{})}

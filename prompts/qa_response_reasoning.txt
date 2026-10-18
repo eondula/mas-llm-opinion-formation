@@ -1,3 +1,3 @@
 {turn_instruction}
 
-Give your reasoning first, as plain text without JSON, markdown, headings or a speaker label. Then end with a final line of the form "Answer: Yes" or "Answer: No".
+Write plain text without headings, lists, or a speaker label. {closing}

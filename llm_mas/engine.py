@@ -64,6 +64,24 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
             latest[i] = row
             rows.append(row)
             emit(kind='response', row=row, completed=len(rows), total=(config['rounds']+1)*n)
+        if config.get('stopping') == 'agent_signal' and t >= 1:
+            # Agents state Next: continue/finish in each response; no separate closure prompt.
+            current = rows[-n:]
+            yoked = config.get('yoked_rounds')
+            if yoked is not None:
+                # No-peer control runs as long as its matched peer conversation.
+                reason = 'yoked_to_peer_branch' if t >= yoked else None
+            else:
+                reason = ('agents_finished' if all(r.get('next_action') == 'finish' for r in current)
+                          else 'budget_exhausted' if t == config['rounds'] else None)
+            termination = dict(round=t, policy='agent_signal', reason=reason,
+                               next_actions={r['agent']: r.get('next_action') for r in current},
+                               **({'yoked_rounds': yoked} if yoked is not None else {}))
+            for row in current:
+                row['termination'] = termination
+            emit(kind='termination_check', **termination, completed=len(rows), total=(config['rounds']+1)*n)
+            if reason:
+                break
         if config.get('stopping') == 'agent_closure' and t >= 1:
             from .closure import check
             termination = check(config, texts, runtimes, models, names, histories, rows[-n:], t)

@@ -4,15 +4,15 @@
     "Qwen/Qwen2.5-1.5B-Instruct"
   ],
   "agents": 2,
-  "rounds": 3,
+  "rounds": 5,
   "repetitions": 1,
   "initialization": "natural",
   "schedule": "synchronous",
-  "stopping": "fixed",
+  "stopping": "agent_signal",
   "decoding": "greedy",
   "seed": 42,
   "sentiment": true,
-  "max_argument_tokens": 512,
+  "max_argument_tokens": 256,
   "research": [],
   "dataset": {
     "name": "strategyqa",
@@ -26,6 +26,5 @@
   "output_layout": "experiment",
   "message_similarity": true,
   "response_protocol": "reasoning_answer_v3",
-  "copy_block_ngram": 6,
   "question_figure_profile": "question_png"
 }

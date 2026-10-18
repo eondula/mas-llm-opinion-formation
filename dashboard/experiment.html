@@ -16,6 +16,7 @@
 <label>Agent configuration<select id="agent-configuration"><option value="homogeneous">Homogeneous · shared checkpoint</option><option value="heterogeneous">Heterogeneous · choose per agent</option></select></label>
 <label id="shared-model-label">Shared model<select id="shared-model"></select></label><div id="agent-models" hidden></div><p id="model-help"></p><textarea id="models" hidden aria-hidden="true"></textarea>
 </div><label>Update rounds <input id="rounds" type="number" value="3" min="0" required></label>
+<label>Stopping <select id="stopping"><option value="agent_signal">Agents decide · update rounds are the budget</option><option value="fixed">Fixed number of rounds</option></select></label>
 <label>Communication <select id="schedule"><option value="synchronous">Synchronous</option><option value="sequential">Sequential · forward</option><option value="reverse_sequential">Sequential · reverse</option><option value="no_peer">No peer</option></select></label>
 <label>Initial answers <select id="initialization"><option value="natural">Natural</option><option value="forced">Forced · Yes/No per agent</option></select></label>
 <div id="forced-answers" class="grid" hidden></div>
@@ -30,7 +31,7 @@
 <label>Generation seed <input id="seed" type="number" value="42" min="0" max="4294967295" required></label>
 <div id="sampling-controls"><label>Sampling method<select id="sampling-method"><option value="temperature">Temperature only</option><option value="top_p">Top-p only</option><option value="combined" selected>Temperature and top-p</option></select></label><label id="temperature-label">Temperature <input id="temperature" type="number" value="0.7" min="0.01" step="0.05" required></label>
 <label id="top-p-label">Top-p <input id="top-p" type="number" value="0.9" min="0.01" max="1" step="0.05" required></label><p id="sampling-help" class="hint"></p></div>
-<label>Response token budget <input id="tokens" type="number" value="512" min="16" required></label>
+<label>Response token budget <input id="tokens" type="number" value="256" min="16" required></label>
 <label>Device <select id="device"><option value="auto">Automatic</option><option value="cpu">CPU</option><option value="cuda">CUDA</option><option value="mps">MPS</option></select></label>
 
 <label>Questions (optional selection)<select id="questions" multiple size="5"></select></label><p id="dataset-help" class="hint">Loading questions…</p>
