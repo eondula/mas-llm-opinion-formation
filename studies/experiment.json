@@ -25,6 +25,7 @@
   "question_seed": 42,
   "output_layout": "experiment",
   "message_similarity": true,
-  "response_protocol": "decision_time_v2",
+  "response_protocol": "reasoning_answer_v3",
+  "copy_block_ngram": 6,
   "question_figure_profile": "question_png"
 }

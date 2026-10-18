@@ -1,0 +1,2 @@
+Message from {speaker} (round {source_round}):
+{message}

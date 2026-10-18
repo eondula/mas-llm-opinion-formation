@@ -4,6 +4,7 @@ from .locations import input_path
 def templates():
     names = ('system', 'scenario', 'starting_assessment', 'peer_message', 'stance_probe', 'generate_argument', 'select_argument', 'conversational_argument', 'combined_fixed', 'combined_reasoning', 'open_discussion', 'topic_discussion', 'topic_system', 'topic_probe', 'discussion_then_decision', 'joint_task', 'closure', 'exploration_system', 'exploration_response', 'exploration_probe', 'exploration_deliberation')
     names += ('qa_system', 'qa_initial', 'qa_response', 'qa_probe', 'qa_peer_message', 'qa_response_decision')
+    names += ('qa_system_v3', 'qa_peer_message_v3', 'qa_turn_initial_v3', 'qa_turn_forced_v3', 'qa_turn_update_v3', 'qa_response_reasoning')
     return {name: input_path('prompts/' + name + '.txt', ROOT).read_text() for name in names}
 
 def initial(scenario, texts, order='strategy_1_first', agents=2, persona=None, agent_name=None, prompt_style="original", joint_task_brief=None):
@@ -64,17 +65,20 @@ def for_condition(texts, config, scenario):
     return dict(texts, stance_probe=template)
 
 
-def question_initial(task, texts, agents, agent_name=None, schedule='synchronous'):
+def question_initial(task, texts, agents, agent_name=None, schedule='synchronous', protocol=None):
     from .tasks import validate_question
     validate_question(task)
-    system = texts['qa_system']
+    v3 = protocol == 'reasoning_answer_v3'
+    system = texts['qa_system_v3'].rstrip('\n') if v3 else texts['qa_system']
     if agent_name:
         system += '\nYour name is ' + agent_name + '.'
     if agents == 1 or schedule == 'no_peer':
-        system += '\nYou are considering the question independently and receive no peer messages. You may keep or revise your answer and reasoning.'
+        system += ('\nYou are answering independently and receive no messages from other agents.' if v3 else
+                   '\nYou are considering the question independently and receive no peer messages. You may keep or revise your answer and reasoning.')
     else:
         from .engine import names_for
         peers = ', '.join(name for name in names_for(agents) if name != agent_name)
-        system += '\nYou are in a conversation with ' + peers + '. You may keep or change your answer and argument as the conversation develops.'
+        system += ('\nYou are in a discussion with ' + peers + '.' if v3 else
+                   '\nYou are in a conversation with ' + peers + '. You may keep or change your answer and argument as the conversation develops.')
     return [dict(role='system', content=system),
             dict(role='user', content=texts['qa_initial'].format(question=task['question']))]

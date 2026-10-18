@@ -57,7 +57,7 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
                     deliveries.append(dict(speaker=names[j], receiver=names[i], message=source['message'],
                                            round=t, source_id=source['response_id'], source_round=source['round']))
                     histories[i].append(dict(role='user', content=texts['peer_message'].format(
-                        speaker=names[j], message=source['message'])))
+                        speaker=names[j], message=source['message'], source_round=source['round'])))
             row = policy.respond(runtime, histories[i], t, i, deliveries, before, decision_context)
             row.setdefault('response_id', f'r{t}_a{i}')
             messages[i] = row['message']

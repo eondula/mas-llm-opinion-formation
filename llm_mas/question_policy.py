@@ -27,17 +27,26 @@ def parse(output):
 class QuestionResponsePolicy:
     def __init__(self, config, task, texts, names, models):
         self.config, self.task = config, task
-        self.texts = dict(texts, peer_message=texts['qa_peer_message'])
+        self.v3 = config.get('response_protocol') == 'reasoning_answer_v3'
+        self.texts = dict(texts, peer_message=texts['qa_peer_message_v3' if self.v3 else 'qa_peer_message'])
         self.names, self.models = names, models
 
     def initial(self, i):
-        return question_initial(self.task, self.texts, self.config['agents'], self.names[i], 'synchronous' if self.config.get('paired_control') else self.config['schedule'])
+        return question_initial(self.task, self.texts, self.config['agents'], self.names[i], 'synchronous' if self.config.get('paired_control') else self.config['schedule'],
+                                self.config.get('response_protocol'))
 
     def before(self, runtime, history):
         return runtime.measure(history, self.task, self.texts)
 
     def response_prompt(self, t, i, deliveries):
         forced = t == 0 and self.config['initialization'] != 'natural'
+        if self.v3:
+            # One update instruction covers peer and no-peer branches, so paired controls match.
+            rounds = self.config.get('planned_rounds', self.config['rounds'])
+            turn = (self.texts['qa_turn_forced_v3'].format(rounds=rounds, answer='Yes' if self.config['initialization'][i] == 1 else 'No') if forced else
+                    self.texts['qa_turn_initial_v3'].format(rounds=rounds) if t == 0 else
+                    self.texts['qa_turn_update_v3'].format(round=t, rounds=rounds))
+            return self.texts['qa_response_reasoning'].format(turn_instruction=turn.rstrip('\n'))
         if forced:
             answer = 'Yes' if self.config['initialization'][i] == 1 else 'No'
             turn = (f'No peer has spoken yet. Your assigned initial answer is {answer}. '
@@ -68,7 +77,15 @@ class QuestionResponsePolicy:
             options['sampling'] = sampling
         decision_time=None
         pre_response_probe=decision
-        if self.config.get('response_protocol')=='decision_time_v2':
+        if self.v3:
+            own=[m['content'] for m in history if m['role']=='assistant']
+            exempt=[m['content'] for m in history[:2]]+[prompt]
+            result=runtime.generate_reasoning_response(history+[dict(role='user',content=prompt)],
+                self.config['max_argument_tokens'],own,exempt,self.config['copy_block_ngram'],sampling=options.get('sampling'),assigned=assigned)
+            answer,argument,status=result['answer'],result['argument'],'valid'
+            generation=result['generation'];generation['instruction']=prompt
+            decision_time=result['measurement'];decision=decision_time
+        elif self.config.get('response_protocol')=='decision_time_v2':
             result=runtime.generate_binary_response(history+[dict(role='user',content=prompt)],
                 self.config['max_argument_tokens'],sampling=options.get('sampling'),assigned=assigned)
             answer,argument,status=result['answer'],result['argument'],'valid'
@@ -87,7 +104,7 @@ class QuestionResponsePolicy:
             answer, argument, status = parse(generation['complete_output'])
             if forced and answer is not None and answer != assigned:
                 answer, argument, status = None, '', 'invalid_forced_answer'
-        message = answer + '\n' + argument if answer else generation['complete_output']
+        message = result['message'] if self.v3 else answer + '\n' + argument if answer else generation['complete_output']
         history.append(dict(role='assistant', content=message))
         runtime.interaction_context['stage'] = 'post'
         post = runtime.measure(history, self.task, self.texts)

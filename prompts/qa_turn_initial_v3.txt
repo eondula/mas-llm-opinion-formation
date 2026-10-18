@@ -1,0 +1,2 @@
+Round 0 of {rounds}. No other agent has spoken yet.
+Write 2–3 sentences of reasoning about the question.

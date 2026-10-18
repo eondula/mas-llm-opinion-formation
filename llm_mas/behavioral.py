@@ -10,6 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 from statistics import mean, pstdev
 from .storage import write
+from .decision_generation import DECISION_PROTOCOLS
 from .trajectories import conversations
 
 VERSION = 'strategyqa-behavioral-v2'
@@ -59,7 +60,7 @@ def analyze(path, tolerance=0.01):
         config = record['config']
         identity = dict(protocol_hash=record.get('protocol_hash'),pair_id=record.get('pair_id'),initialization_hash=record.get('initialization_hash'),control_design=record.get('control_design','independently_initialized'),task=file.stem, question_id=record['question_id'],
                         repetition=record.get('repetition', 0), research_split=record.get('research_split'),
-                        source_partition=record['dataset']['partition'], stance_measurement='decision_time' if config.get('response_protocol')=='decision_time_v2' else 'post_response_probe', **condition(config))
+                        source_partition=record['dataset']['partition'], stance_measurement='decision_time' if config.get('response_protocol') in DECISION_PROTOCOLS else 'post_response_probe', **condition(config))
         expected = record.get('evaluation', {}).get('reference_answer')
         labeled = expected in ('Yes', 'No')
         rows = record['rows']

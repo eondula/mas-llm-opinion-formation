@@ -10,6 +10,7 @@ from .engine import conversation
 
 from .storage import write, read  # Keep write available for existing callers.
 from .provenance import source_hashes, environment
+from .decision_generation import DECISION_PROTOCOLS
 from .trajectories import SCHEMA_VERSION, read_conversation
 
 
@@ -107,7 +108,7 @@ def execute(raw, name=None, resume=False, launch_token=None):
             for model_name in config.get('model_revisions',{}):load_runtime(model_name,config)
             from .stance_audit import audit
             status('stance_audit')
-            audit(path,config['tasks'],texts,runtimes,protocol_hash,lambda a,b:status('stance_audit',phase_completed=a,phase_total=b),make_figures=config.get('question_figure_profile')!='question_png',measurement_role='auxiliary_probe' if config.get('response_protocol')=='decision_time_v2' else 'primary_probe')
+            audit(path,config['tasks'],texts,runtimes,protocol_hash,lambda a,b:status('stance_audit',phase_completed=a,phase_total=b),make_figures=config.get('question_figure_profile')!='question_png',measurement_role='auxiliary_probe' if config.get('response_protocol') in DECISION_PROTOCOLS else 'primary_probe')
         for ti, active in enumerate(tasks):
             for si, scenario in enumerate(active['scenarios']):
                 target = path/'conversations'/f'{ti:03d}_{si:03d}.json'
@@ -155,7 +156,7 @@ def execute(raw, name=None, resume=False, launch_token=None):
                 record = dict(schema_version=SCHEMA_VERSION, config=execution, scenario=scenario,
                               question_id=scenario['id'], repetition=active.get('repetition', 0),
                               measurement_stages=dict(before='before_peer_delivery',
-                                  decision='public_answer_token_before_explanation' if config.get('response_protocol')=='decision_time_v2' else 'after_peer_delivery_and_optional_discussion', post='after_public_response_probe',primary='decision_time' if config.get('response_protocol')=='decision_time_v2' else 'post'),
+                                  decision='answer_token_after_reasoning' if config.get('response_protocol')=='reasoning_answer_v3' else 'public_answer_token_before_explanation' if config.get('response_protocol')=='decision_time_v2' else 'after_peer_delivery_and_optional_discussion', post='after_public_response_probe',primary='decision_time' if config.get('response_protocol') in DECISION_PROTOCOLS else 'post'),
                               rows=rows, termination=termination)
                 if snapshot:
                     record.update(pair_id=snapshot['pair_id'],initialization_hash=snapshot['initialization_hash'],control_design='shared_initialization',protocol_hash=protocol_hash)

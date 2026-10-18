@@ -104,15 +104,24 @@ class Runtime:
         from .measurement import measure
         return measure(self, history, scenario, texts)
 
-    def generate(self, messages, max_tokens, continuation_prefix='', sampling=None, allow_empty=False):
+    def generate(self, messages, max_tokens, continuation_prefix='', sampling=None, allow_empty=False,
+                 decoding=None, logits_processor=None, stopping_criteria=None):
         rendered, inputs = self.inputs(messages, continuation_prefix)
         self.check_context(inputs.input_ids.shape[1], reserve_tokens=max_tokens)
         options = dict(do_sample=bool(sampling), num_beams=1)
+        # Explicit decoding settings override checkpoint generation_config defaults.
+        if decoding:
+            options.update(decoding)
         if sampling:
             self.torch.manual_seed(sampling['seed'])
             options.update({k:sampling[k] for k in ('temperature','top_p','top_k')})
+        extra = {}
+        if logits_processor:
+            extra['logits_processor'] = logits_processor
+        if stopping_criteria:
+            extra['stopping_criteria'] = stopping_criteria
         with self.torch.inference_mode():
-            output = self.model.generate(**inputs, max_new_tokens=max_tokens, **options,
+            output = self.model.generate(**inputs, max_new_tokens=max_tokens, **options, **extra,
                                          pad_token_id=self.tokenizer.eos_token_id)
         text = self.tokenizer.decode(output[0][inputs.input_ids.shape[1]:], skip_special_tokens=True).strip()
         if not text and not allow_empty: raise ValueError('Empty generated argument')
@@ -123,6 +132,10 @@ class Runtime:
     def generate_binary_response(self, messages, max_tokens, sampling=None, assigned=None):
         from .decision_generation import generate
         return generate(self,messages,max_tokens,sampling,assigned)
+
+    def generate_reasoning_response(self, messages, max_tokens, own_messages, exempt, copy_block_ngram, sampling=None, assigned=None):
+        from .decision_generation import generate_reasoning_first
+        return generate_reasoning_first(self,messages,max_tokens,own_messages,exempt,copy_block_ngram,sampling,assigned)
 
     def select_argument(self, history, selected, texts):
         """Constrained deterministic choice among numbered argument entries."""

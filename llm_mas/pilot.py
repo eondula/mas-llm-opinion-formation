@@ -134,7 +134,7 @@ def shared_initialization(path,config,task,texts,runtimes,protocol_hash,progress
         snapshot=read(file)
         if snapshot['coordinates']!=coordinates or digest(snapshot['rows'])!=snapshot['initialization_hash']:raise ValueError('Shared initialization snapshot changed')
     else:
-        rows=conversation(dict(config,rounds=0,schedule='synchronous'),task,texts,runtimes,emit=progress)
+        rows=conversation(dict(config,rounds=0,planned_rounds=config['rounds'],schedule='synchronous'),task,texts,runtimes,emit=progress)
         snapshot=dict(pair_id=pair_id,coordinates=coordinates,rows=rows,initialization_hash=digest(rows))
         write(file,snapshot)
     return deepcopy(snapshot)
