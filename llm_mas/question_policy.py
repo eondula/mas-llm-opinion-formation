@@ -51,7 +51,8 @@ class QuestionResponsePolicy:
                     'You may keep or revise your earlier view. No peer message has been delivered.')
         if t>0 and self.config.get('paired_control'):
             turn='Continue considering the question and share your answer and reasoning. You may keep or change your view and refer to other agents by name when their messages are available.'
-        return self.texts['qa_response'].format(turn_instruction=turn)
+        template='qa_response_decision' if self.config.get('response_protocol')=='decision_time_v2' else 'qa_response'
+        return self.texts[template].format(turn_instruction=turn)
 
     def respond(self, runtime, history, t, i, deliveries, before, decision_context=None):
         decision_history = deepcopy(history)
@@ -65,18 +66,27 @@ class QuestionResponsePolicy:
             sampling = dict(self.config['sampling'])
             sampling['seed'] += self.config.get('seed_offset', 0) + t * self.config['agents'] + i
             options['sampling'] = sampling
-        prefix = '{"answer": ' + json.dumps(assigned) + ', "explanation": ' if forced else ''
-        if forced:
-            options['continuation_prefix'] = prefix
-        runtime.interaction_context['stage'] = 'response'
-        generation = dict(runtime.generate(history + [dict(role='user', content=prompt)],
-                                          self.config['max_argument_tokens'], **options),
-                          instruction=prompt, choice_parser_version=PARSER_VERSION)
-        generation['continuation_prefix'] = prefix
-        generation['complete_output'] = prefix + generation['output']
-        answer, argument, status = parse(generation['complete_output'])
-        if forced and answer is not None and answer != assigned:
-            answer, argument, status = None, '', 'invalid_forced_answer'
+        decision_time=None
+        pre_response_probe=decision
+        if self.config.get('response_protocol')=='decision_time_v2':
+            result=runtime.generate_binary_response(history+[dict(role='user',content=prompt)],
+                self.config['max_argument_tokens'],sampling=options.get('sampling'),assigned=assigned)
+            answer,argument,status=result['answer'],result['argument'],'valid'
+            generation=result['generation'];generation['instruction']=prompt
+            decision_time=result['measurement'];decision=decision_time
+        else:
+            prefix = '{"answer": ' + json.dumps(assigned) + ', "explanation": ' if forced else ''
+            if forced:
+                options['continuation_prefix'] = prefix
+            runtime.interaction_context['stage'] = 'response'
+            generation = dict(runtime.generate(history + [dict(role='user', content=prompt)],
+                                              self.config['max_argument_tokens'], **options),
+                              instruction=prompt, choice_parser_version=PARSER_VERSION)
+            generation['continuation_prefix'] = prefix
+            generation['complete_output'] = prefix + generation['output']
+            answer, argument, status = parse(generation['complete_output'])
+            if forced and answer is not None and answer != assigned:
+                answer, argument, status = None, '', 'invalid_forced_answer'
         message = answer + '\n' + argument if answer else generation['complete_output']
         history.append(dict(role='assistant', content=message))
         runtime.interaction_context['stage'] = 'post'
@@ -84,6 +94,6 @@ class QuestionResponsePolicy:
         return dict(response_id=f'r{t}_a{i}', question_id=self.task['id'], round=t,
                     agent=self.names[i], model=self.models[i], answer=answer,
                     strategy=1 if answer == 'Yes' else 2 if answer == 'No' else None,
-                    choice_status=status, forced=forced, assigned_initial_answer=assigned, before=before, decision=decision, post=post,
+                    choice_status=status, decision_time=decision_time, stance_source='decision_time' if decision_time else 'post_response_probe', pre_response_probe=pre_response_probe, forced=forced, assigned_initial_answer=assigned, before=before, decision=decision, post=post,
                     message=message, argument=argument, generation=generation,
                     deliveries=deliveries, decision_history=decision_history, history=deepcopy(history))

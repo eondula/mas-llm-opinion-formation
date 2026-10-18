@@ -8,7 +8,7 @@ from .trajectories import conversations
 from .behavioral import csv_write
 
 
-def analyze(path,data):
+def analyze(path,data,make_figures=True):
     path=Path(path);pairs=defaultdict(list)
     for _,record in conversations(path):
         if record.get('pair_id'):pairs[record['pair_id']].append(record)
@@ -63,6 +63,9 @@ def analyze(path,data):
     csv_write(path/'tables/informative_variation.csv',diagnostics)
     result=dict(pairing=checks,paired_group_outcomes=paired_outcomes,initial_state_strata=strata_rows,variation=diagnostics,note='Rank and variation diagnose whether future influence-weight estimation is informative. No influence weights are fitted. Cross-model stance scales remain uncalibrated.')
     write(path/'analysis/pilot_validation.json',result)
+    if not make_figures:
+        if any(not r['valid'] for r in checks):raise ValueError('Paired-control validation failed; inspect tables/pairing_validation.csv')
+        return result
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt

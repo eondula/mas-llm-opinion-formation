@@ -13,13 +13,14 @@ from llm_mas.tasks import question_task
 
 
 def main():
-    destination=ROOT/'results/preflight/pilot-v1'
+    destination=ROOT/'results/preflight/pilot-v5'
+    if destination.exists():raise ValueError('Preflight output already exists; preserve it and choose a new directory')
     source=preset();models=list(source['model_revisions'])
     tasks=[question_task('preflight-arithmetic','Is two plus two equal to four?'),question_task('preflight-contradiction','Is two greater than ten?')]
     runtimes={name:Runtime(name,'cpu',**runtime_options(source,name)) for name in models}
     texts=templates()
     result=audit(destination,tasks,texts,runtimes,'preflight-only',lambda done,total:print(f'Audit {done}/{total}',flush=True))
-    c=resolve(dict(mode='experiment',dataset=dict(path='data/strategyqa',split='train'),models=models,agents=2,agent_configuration='heterogeneous',rounds=1,repetitions=1,question_count=1,sentiment=False,message_similarity=False,device='cpu',max_argument_tokens=128,decoding='fixed_sampling',sampling_method='combined',sampling=dict(temperature=.7,top_p=.9,seed=42),paired_control=True,conditions=[dict(schedule='synchronous'),dict(schedule='no_peer')]))
+    c=resolve(dict(mode='experiment',dataset=dict(path='data/strategyqa',split='train'),models=models,agents=2,agent_configuration='heterogeneous',rounds=1,repetitions=1,question_count=1,sentiment=False,message_similarity=False,device='cpu',max_argument_tokens=512,decoding='fixed_sampling',sampling_method='combined',sampling=dict(temperature=.7,top_p=.9,seed=42),paired_control=True,conditions=[dict(schedule='synchronous'),dict(schedule='no_peer')]))
     task=tasks[0];snapshot=shared_initialization(destination,c,task,texts,runtimes,'preflight-only')
     branches={s:conversation(dict(c,schedule=s),task,texts,runtimes,initial_rows=snapshot['rows']) for s in ['synchronous','no_peer']}
     assert branches['synchronous'][:2]==branches['no_peer'][:2]

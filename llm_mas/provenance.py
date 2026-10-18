@@ -33,8 +33,9 @@ def environment(config, runtimes):
     exploration = config['mode'] == 'scenario_exploration'
     return dict(schema_version=2, python=platform.python_version(), platform=platform.platform(),
                 packages=packages, models=models,
-                parser='binary-answer-json-v1' if config.get('dataset') else 'strict-json-1' if exploration else PARSER_VERSION,
-                scorer=EXPLORATION_SCORER_VERSION if exploration else SCORER_VERSION,
+                parser=('application-serialized-answer-v2' if config.get('response_protocol')=='decision_time_v2' else 'binary-answer-json-v1') if config.get('dataset') else 'strict-json-1' if exploration else PARSER_VERSION,
+                scorer='answer-token-logits-v1' if config.get('response_protocol')=='decision_time_v2' else EXPLORATION_SCORER_VERSION if exploration else SCORER_VERSION,
+                auxiliary_probe_scorer=SCORER_VERSION,primary_measurement='decision_time' if config.get('response_protocol')=='decision_time_v2' else 'post_response_probe',
                 measurement_probe='question-yes-no-v1' if config.get('dataset') else 'historical-configured-probe',
                 decoding=config['decoding'], sampling=config.get('sampling'),
                 seed=config.get('seed', 42), repetitions=config.get('repetitions', 1))

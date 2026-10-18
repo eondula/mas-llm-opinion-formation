@@ -2,6 +2,7 @@
 
 Peer movement is an association, not a causal estimate. No model calls are made.
 """
+from .output_state import measurement
 import csv
 import json
 import math
@@ -58,7 +59,7 @@ def analyze(path, tolerance=0.01):
         config = record['config']
         identity = dict(protocol_hash=record.get('protocol_hash'),pair_id=record.get('pair_id'),initialization_hash=record.get('initialization_hash'),control_design=record.get('control_design','independently_initialized'),task=file.stem, question_id=record['question_id'],
                         repetition=record.get('repetition', 0), research_split=record.get('research_split'),
-                        source_partition=record['dataset']['partition'], **condition(config))
+                        source_partition=record['dataset']['partition'], stance_measurement='decision_time' if config.get('response_protocol')=='decision_time_v2' else 'post_response_probe', **condition(config))
         expected = record.get('evaluation', {}).get('reference_answer')
         labeled = expected in ('Yes', 'No')
         rows = record['rows']
@@ -73,10 +74,10 @@ def analyze(path, tolerance=0.01):
             previous_direction = None
             local = []
             for row in history:
-                stance = number(row.get('post', {}).get('stance'))
-                margin = number(row.get('post', {}).get('margin'))
-                old_stance = number(previous.get('post', {}).get('stance')) if previous else None
-                old_margin = number(previous.get('post', {}).get('margin')) if previous else None
+                stance = number(measurement(row).get('stance'))
+                margin = number(measurement(row).get('margin'))
+                old_stance = number(measurement(previous).get('stance')) if previous else None
+                old_margin = number(measurement(previous).get('margin')) if previous else None
                 change = delta(stance, old_stance)
                 direction = (1 if change > tolerance else -1 if change < -tolerance else 0) if change is not None else None
                 valid = row.get('answer') in ('Yes', 'No')
@@ -89,7 +90,7 @@ def analyze(path, tolerance=0.01):
                         missing += 1
                     else:
                         sources.append(source)
-                peer_stance = average([number(r.get('post', {}).get('stance')) for r in sources])
+                peer_stance = average([number(measurement(r).get('stance')) for r in sources])
                 peers_valid = [r['answer'] for r in sources if r.get('answer') in ('Yes', 'No')]
                 peer_majority = None
                 if len(peers_valid) == len(sources) and peers_valid and peers_valid.count('Yes') != peers_valid.count('No'):
@@ -107,7 +108,7 @@ def analyze(path, tolerance=0.01):
                     resolved=source in sources
                     delivery_rows.append(dict(**identity,agent=name,round=row['round'],response_id=row['response_id'],
                         speaker=delivery['speaker'],source_response_id=delivery.get('source_id'),source_round=delivery.get('source_round'),resolved=resolved,
-                        source_stance=number(source.get('post',{}).get('stance')) if resolved else None,
+                        source_stance=number(measurement(source).get('stance')) if resolved else None,
                         source_answer=source.get('answer') if resolved else None,
                         exact_peer_argument=row.get('argument','').strip()==source.get('argument','').strip() if resolved and valid and source.get('answer') in ('Yes','No') else None))
                 point = dict(**identity, agent=name, model=row.get('model'), round=row['round'],
@@ -127,7 +128,7 @@ def analyze(path, tolerance=0.01):
                              stable=abs(change) <= tolerance if change is not None else None,
                              direction_reversal=direction * previous_direction < 0 if direction is not None and previous_direction is not None else None,
                              repeated_argument=row.get('argument','').strip() == previous.get('argument','').strip() if previous and valid and old_valid else None,
-                             delivered_source_ids=json.dumps([d.get('source_id') for d in row.get('deliveries',[])]),delivered_source_rounds=json.dumps([d.get('source_round') for d in row.get('deliveries',[])]),delivered_peer_stances=json.dumps([number(s.get('post',{}).get('stance')) for s in sources]),delivered_peers=len(row.get('deliveries', [])), unresolved_deliveries=missing,
+                             delivered_source_ids=json.dumps([d.get('source_id') for d in row.get('deliveries',[])]),delivered_source_rounds=json.dumps([d.get('source_round') for d in row.get('deliveries',[])]),delivered_peer_stances=json.dumps([number(measurement(s).get('stance')) for s in sources]),delivered_peers=len(row.get('deliveries', [])), unresolved_deliveries=missing,
                              peer_mean_stance=peer_stance, peer_majority=peer_majority,
                              peer_answer_disagreement=fraction([a != previous['answer'] for a in peers_valid]) if old_valid and peers_valid else None,
                              movement_toward_peers=toward, peer_distance_reduction=distance_reduction,
@@ -163,7 +164,7 @@ def analyze(path, tolerance=0.01):
             yes=sum(r.get('answer')=='Yes' for r in current)
             no=sum(r.get('answer')=='No' for r in current)
             complete=len(current)==config['agents'] and yes+no==config['agents']
-            values=[number(r.get('post',{}).get('stance')) for r in current]
+            values=[number(measurement(r).get('stance')) for r in current]
             values=[v for v in values if v is not None]
             majority=('Yes' if yes>no else 'No') if complete and yes!=no else None
             consensus=complete and (yes==len(current) or no==len(current)) if config['agents']>1 else None
@@ -232,7 +233,7 @@ def analyze(path, tolerance=0.01):
                      majority_accuracy_denominator='All labeled conversations; ties and invalid groups count as unsuccessful',
                      aggregation='Pooled observations within each model/group/schedule/start/decoding/dataset split condition; questions and runs reported separately',
                      consensus='All configured agents have valid identical answers; undefined for a single agent',
-                     peer_movement='Descriptive association with source-row post-response stance for messages actually delivered; not causal influence',
+                     peer_movement='Descriptive association with source-row primary stance (decision-time when recorded, legacy post-response otherwise) for messages actually delivered; not causal influence',
                      oscillation='Sign reversal between consecutive stance updates exceeding the stability tolerance; flat updates break the sequence',
                      missing_values='Null means unavailable or inapplicable; invalid outputs are not replaced with scored answers')
     write(analysis/'behavioral.json',dict(definitions=definitions,summary=summaries,turns=turns,agents=agents,groups=groups))

@@ -63,6 +63,10 @@ def resolve(raw, planned=False):
                 or raw.get('research') or raw.get('export_profile') or raw.get('joint_task_brief')
                 or raw.get('argument_source', 'own') != 'own' or raw.get('information_access', 'none') != 'none'):
             raise ValueError('Historical personas, argument probes, joint tasks and exporters are not StrategyQA protocols')
+        raw=dict(raw)
+        raw.setdefault('response_protocol','legacy_json' if raw.get('pilot_protocol','').startswith('strategyqa-pilot-v4-') else 'decision_time_v2')
+        raw.setdefault('question_figure_profile','question_png')
+        raw.setdefault('max_argument_tokens',512)
         raw = dict(raw, **required, dataset=dataset, tasks=tasks, scenarios=tasks,
                    question_ids=[t['id'] for t in tasks], question_count=len(tasks))
     if raw.get('mode') == 'scenario_exploration':
@@ -101,6 +105,9 @@ def resolve(raw, planned=False):
     if c.get('output_layout') not in (None, 'experiment'):
         raise ValueError('Unknown output layout')
     if c.get('dataset'):
+        if c.get('response_protocol') not in ('legacy_json','decision_time_v2'):raise ValueError('Unknown question response protocol')
+        if c.get('question_figure_profile') not in ('question_png','full'):raise ValueError('Unknown question figure profile')
+        if c['response_protocol']=='decision_time_v2' and c['max_argument_tokens']<2:raise ValueError('Decision-time response budget must be at least two tokens')
         c.setdefault('message_similarity', True)
         if type(c['message_similarity']) is not bool:
             raise ValueError('message_similarity must be boolean')

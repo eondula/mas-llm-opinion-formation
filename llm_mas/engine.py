@@ -3,6 +3,7 @@
 Response policies preserve historical prompting, parsing and scoring semantics.
 """
 from copy import deepcopy
+from .output_state import measurement
 from .response_policy import LegacyResponsePolicy, discussion_prompt
 
 
@@ -93,11 +94,11 @@ def conversation(config, scenario, texts, runtimes, emit=lambda **event: None, d
             if config['stopping'] in ('combined_stability', 'sign_stability'):
                 previous = {r['agent']:r for r in rows[-2*n:-n]}
                 current = {r['agent']:r for r in rows[-n:]}
-                deltas = {name:abs(current[name]['post']['margin']-previous[name]['post']['margin']) for name in names}
+                deltas = {name:abs(measurement(current[name])['margin']-measurement(previous[name])['margin']) for name in names}
                 unchanged = {name:current[name]['strategy'] is not None and previous[name]['strategy'] is not None and current[name]['strategy']==previous[name]['strategy'] for name in names}
                 details.update(margin_changes=deltas, strategy_unchanged=unchanged)
                 if config['stopping'] == 'sign_stability':
-                    signs = {name:(current[name]['post']['margin'] >= 0) == (previous[name]['post']['margin'] >= 0) for name in names}
+                    signs = {name:(measurement(current[name])['margin'] >= 0) == (measurement(previous[name])['margin'] >= 0) for name in names}
                     matched = [name for name in matched if unchanged[name] and signs[name]]
                     details.update(margin_sign_unchanged=signs, zero_convention='nonnegative_favors_strategy_1')
                 else:

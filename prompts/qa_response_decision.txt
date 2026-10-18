@@ -1,0 +1,3 @@
+{turn_instruction}
+
+Begin with your answer, Yes or No. On the next line, explain your reasoning and respond to the conversation. Write plain text without JSON or markdown fences.

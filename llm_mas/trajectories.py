@@ -30,5 +30,5 @@ def observations(record, task=None):
                    model=row.get('model'), round=row['round'],
                    answer=row.get('answer', row.get('strategy')), answer_status=row.get('choice_status'),
                    before=row.get('before'), decision=row.get('decision'),
-                   post=row.get('post'), sentiment=row.get('sentiment'),
+                   decision_time=row.get('decision_time'), stance_source=row.get('stance_source','post_response_probe'), post=row.get('post'), sentiment=row.get('sentiment'),
                    argument=row.get('argument'), deliveries=row.get('deliveries', []))

@@ -39,6 +39,9 @@ def display_event(event):
     from .choice_output import display_message
     small['display_message'] = display_message(row)
     small['post']={k:row.get('post',{}).get(k) for k in ('stance','margin') if k in row.get('post',{})}
+    if row.get('decision_time'):
+        small['decision_time']={k:row['decision_time'][k] for k in ('stance','margin','selected_answer','score_preferred_answer')}
+    small['stance_source']='decision_time' if row.get('decision_time') else 'post_response_probe'
     if 'diagnostic' in row:
         small['diagnostic']={k:row['diagnostic'].get(k) for k in ('status','stage','margin','stance','strategy','tie','error')}
     return dict(task=event['task'],row=small)
@@ -95,7 +98,7 @@ def serve(port=8766):
                         frozen=assert_lock(config,templates());ready=True;message='Frozen protocol ready'
                     except ValueError as error:
                         frozen={};ready=False;message=str(error)
-                    return self.send(dict(config=raw,ready=ready,message=message,protocol_hash=frozen.get('protocol_hash'),conversations=240,paired_blocks=120,logical_rows=2880,generations=2640))
+                    return self.send(dict(config=raw,ready=ready,message=message,protocol_hash=frozen.get('protocol_hash'),conversations=240,paired_blocks=120,logical_rows=2880,generations=2640,generation_stages_per_response=2))
                 if parsed.path=='/api/experiments':
                     entries=[]
                     for folder in sorted((ROOT/'results/experiments').glob('*'),key=lambda p:p.stat().st_mtime,reverse=True):

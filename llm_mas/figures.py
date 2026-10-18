@@ -6,6 +6,9 @@ from pathlib import Path
 
 def render(path):
     path = Path(path)
+    if (path/'config.json').exists() and json.loads((path/'config.json').read_text()).get('question_figure_profile')=='question_png':
+        from .question_figures import render as question_render
+        return question_render(path)
     if (path/'config.json').exists() and json.loads((path/'config.json').read_text()).get('export_profile') == 'experiment_d':
         from .experiment_d import export
         return export(path)

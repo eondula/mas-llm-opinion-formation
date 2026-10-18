@@ -8,7 +8,7 @@ from .storage import write
 from .behavioral import csv_write,average
 
 
-def audit(path,tasks,texts,runtimes,protocol_hash,progress=lambda done,total:None,tolerance=1e-4):
+def audit(path,tasks,texts,runtimes,protocol_hash,progress=lambda done,total:None,tolerance=1e-4,make_figures=True,measurement_role='legacy_probe'):
     path=Path(path);rows=[];total=len(tasks)*3*2*2*len(runtimes)
     for task in tasks:
         base=question_initial(task,texts,2,'Agent A','synchronous')
@@ -54,11 +54,14 @@ def audit(path,tasks,texts,runtimes,protocol_hash,progress=lambda done,total:Non
                 peer=next(r for r in rows if r['model']==names[1] and r['history_hash']==row['history_hash'] and r['order']=='yes_first' and r['repeat']==0)
                 cross_model.append(dict(question_id=row['question_id'],context=row['context'],history_hash=row['history_hash'],model_a=names[0],model_b=names[1],margin_a=row['margin'],margin_b=peer['margin'],margin_difference=peer['margin']-row['margin'],stance_difference=peer['stance']-row['stance']))
     csv_write(path/'audit/cross_model.csv',cross_model)
-    result=dict(cross_model=cross_model,protocol_hash=protocol_hash,status='passed' if passed else 'failed',tolerance=tolerance,summary=summary,rows=rows,
-                note='Identical raw histories, native model chat templates. Probe-order variants are diagnostics only; primary scoring remains unchanged. Score-scale differences are not calibrated away.')
+    result=dict(measurement_role=measurement_role,cross_model=cross_model,protocol_hash=protocol_hash,status='passed' if passed else 'failed',tolerance=tolerance,summary=summary,rows=rows,
+                note='Identical raw histories, native model chat templates. This audit checks the separate probe scorer; decision-time generation records and validates its own raw candidate logits and token boundaries. Probe-order variants are diagnostics only. Score-scale differences are not calibrated away.')
     write(path/'audit/stance_audit.json',result)
     flat=[{k:v for k,v in r.items() if k!='measurement'} for r in rows];csv_write(path/'audit/stance_audit.csv',flat)
     csv_write(path/'audit/summary.csv',summary)
+    if not make_figures:
+        if not passed:raise ValueError('Stance repeatability failed; inspect audit before collection')
+        return result
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt

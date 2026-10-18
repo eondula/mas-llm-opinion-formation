@@ -99,7 +99,7 @@ def execute(raw, name=None, resume=False):
             for model_name in config.get('model_revisions',{}):load_runtime(model_name,config)
             from .stance_audit import audit
             status('stance_audit')
-            audit(path,config['tasks'],texts,runtimes,protocol_hash,lambda a,b:status('stance_audit',phase_completed=a,phase_total=b))
+            audit(path,config['tasks'],texts,runtimes,protocol_hash,lambda a,b:status('stance_audit',phase_completed=a,phase_total=b),make_figures=config.get('question_figure_profile')!='question_png',measurement_role='auxiliary_probe' if config.get('response_protocol')=='decision_time_v2' else 'primary_probe')
         for ti, active in enumerate(tasks):
             for si, scenario in enumerate(active['scenarios']):
                 target = path/'conversations'/f'{ti:03d}_{si:03d}.json'
@@ -147,7 +147,7 @@ def execute(raw, name=None, resume=False):
                 record = dict(schema_version=SCHEMA_VERSION, config=execution, scenario=scenario,
                               question_id=scenario['id'], repetition=active.get('repetition', 0),
                               measurement_stages=dict(before='before_peer_delivery',
-                                  decision='after_peer_delivery_and_optional_discussion', post='after_public_response'),
+                                  decision='public_answer_token_before_explanation' if config.get('response_protocol')=='decision_time_v2' else 'after_peer_delivery_and_optional_discussion', post='after_public_response_probe',primary='decision_time' if config.get('response_protocol')=='decision_time_v2' else 'post'),
                               rows=rows, termination=termination)
                 if snapshot:
                     record.update(pair_id=snapshot['pair_id'],initialization_hash=snapshot['initialization_hash'],control_design='shared_initialization',protocol_hash=protocol_hash)
@@ -230,7 +230,9 @@ def execute(raw, name=None, resume=False):
             analyze(path)
         status('figures')
         from .figures import render
-        if config['mode'] == 'scenario_exploration':
+        if config.get('dataset') and config.get('question_figure_profile')=='question_png':
+            pass  # The compact report renders the question PNGs once below.
+        elif config['mode'] == 'scenario_exploration':
             from .exploration_analysis import plots
             plots(path)
         else:
@@ -240,7 +242,7 @@ def execute(raw, name=None, resume=False):
             from .behavioral_reports import generate, compare_experiments
             generate(path,reanalyze=False)
             if path.parent.name=='experiments':
-                compare_experiments(path.parent,include_current=path)
+                compare_experiments(path.parent,include_current=path) if config.get('question_figure_profile')!='question_png' else None
         status('complete')
     except BaseException as error:
         status('cancelled' if isinstance(error, KeyboardInterrupt) else 'failed', error=str(error))

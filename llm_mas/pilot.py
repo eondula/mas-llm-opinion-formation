@@ -7,11 +7,11 @@ from pathlib import Path
 from .config import ROOT,digest
 from .storage import read,write
 
-PROTOCOL='strategyqa-pilot-v4-mps'
+PROTOCOL='strategyqa-pilot-v5-mps'
 SELECTION='studies/pilot_question_selection.json'
-SPEC='studies/pilot_mps_v4.json'
-LOCK='studies/pilot_mps_v4.lock.json'
-PROTOCOLS={'strategyqa-pilot-v4-'+device:('studies/pilot_'+device+'_v4.json','studies/pilot_'+device+'_v4.lock.json') for device in ('mps','cuda')}
+SPEC='studies/pilot_mps_v5.json'
+LOCK='studies/pilot_mps_v5.lock.json'
+PROTOCOLS={'strategyqa-pilot-v5-'+device:('studies/pilot_'+device+'_v5.json','studies/pilot_'+device+'_v5.lock.json') for device in ('mps','cuda')}
 
 def paths(protocol):
     if protocol not in PROTOCOLS:
@@ -33,12 +33,12 @@ def device_check(device):
         if device=='cuda':raise ValueError('CUDA is unavailable. Use an allocated GPU node and a CUDA-enabled PyTorch environment.') from error
         raise
     return device
-FIELDS=('agent_configuration','mode','models','agents','model_configurations','model_revisions','expected_dtype','dataset','question_ids','question_count','question_balance','question_seed','initialization','rounds','repetitions','schedule','conditions','paired_control','decoding','sampling_method','sampling','seed','max_argument_tokens','device','sentiment','message_similarity','stopping','pilot_protocol','stance_audit')
+FIELDS=('agent_configuration','mode','models','agents','model_configurations','model_revisions','expected_dtype','dataset','question_ids','question_count','question_balance','question_seed','initialization','rounds','repetitions','schedule','conditions','paired_control','decoding','sampling_method','sampling','seed','max_argument_tokens','device','sentiment','message_similarity','stopping','pilot_protocol','stance_audit','response_protocol','question_figure_profile')
 
 
 def preset(root=ROOT,device=None,protocol=None):
     selection=read(Path(root)/SELECTION)
-    protocol=protocol or 'strategyqa-pilot-v4-'+(device or 'mps')
+    protocol=protocol or 'strategyqa-pilot-v5-'+(device or 'mps')
     config=read(Path(root)/paths(protocol)[0])
     if config['question_ids']!=selection['question_ids'] or config['dataset']!=dict(selection['source'],split='train',split_seed=selection['split_seed']):
         raise ValueError('Pilot specification differs from frozen question manifest')
@@ -80,7 +80,7 @@ def descriptor(config,texts,root=ROOT):
         execution.update(cuda_version=torch.version.cuda,gpu=torch.cuda.get_device_name(0) if torch.cuda.is_available() else None)
     return dict(protocol=config['pilot_protocol'],execution=execution,settings=scientific,prompts={k:v for k,v in texts.items() if k.startswith('qa_')},source_sha256=sources,
                 selection_sha256=hashlib.sha256((Path(root)/SELECTION).read_bytes()).hexdigest(),
-                packages=packages,scorer=SCORER_VERSION,measurement_stages=['before_peer_delivery','after_peer_delivery','after_public_response'])
+                packages=packages,scorer='answer-token-logits-v1',auxiliary_probe_scorer=SCORER_VERSION,measurement_stages=['before_peer_delivery_probe','public_answer_token_before_explanation','after_public_response_probe'])
 
 
 def freeze(root=ROOT,device='mps'):

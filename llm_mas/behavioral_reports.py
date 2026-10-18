@@ -66,8 +66,10 @@ def generate(path, reanalyze=True):
     path=Path(path)
     before=snapshots(path)
     if reanalyze:analyze(path)
-    from .behavioral import plots
-    plots(path)
+    compact=(path/'config.json').exists() and json.loads((path/'config.json').read_text()).get('question_figure_profile')=='question_png'
+    if not compact:
+        from .behavioral import plots
+        plots(path)
     data=json.loads((path/'analysis/behavioral.json').read_text())
     references={}
     questions={}
@@ -79,7 +81,7 @@ def generate(path, reanalyze=True):
     distribution['unlabeled']=sum(value not in ('Yes','No') for value in references.values())
     turns,agents,groups=data['turns'],data['agents'],data['groups']
     from .pilot_analysis import analyze as pilot_analysis
-    pilot_analysis(path,data)
+    pilot_analysis(path,data,make_figures=not compact)
     conditions={k:f'C{i+1}' for i,k in enumerate(sorted({key(r) for r in turns},key=str))}
     condition_rows=[dict(condition=label,**dict(zip(CONDITION,k))) for k,label in conditions.items()]
     csv_write(path/'tables/report_conditions.csv',condition_rows)
@@ -108,6 +110,11 @@ def generate(path, reanalyze=True):
             initial_accuracy=fraction([r['initial_correct'] is True for r in labeled]),final_accuracy=fraction([r['final_correct'] is True for r in labeled]),
             reversals=sum(r['answer_reversals'] for r in points)))
     csv_write(path/'tables/per_question_summary.csv',question_rows)
+    if compact:
+        from .question_figures import report
+        report(path,data)
+        if snapshots(path)!=before:raise ValueError('Report generation changed saved conversations')
+        return
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt

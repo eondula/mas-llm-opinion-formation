@@ -12,7 +12,7 @@
   "decoding": "greedy",
   "seed": 42,
   "sentiment": true,
-  "max_argument_tokens": 256,
+  "max_argument_tokens": 512,
   "research": [],
   "dataset": {
     "name": "strategyqa",
@@ -24,5 +24,7 @@
   "question_count": 1,
   "question_seed": 42,
   "output_layout": "experiment",
-  "message_similarity": true
+  "message_similarity": true,
+  "response_protocol": "decision_time_v2",
+  "question_figure_profile": "question_png"
 }

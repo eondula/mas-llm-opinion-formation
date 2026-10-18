@@ -3,7 +3,7 @@ from .locations import input_path
 
 def templates():
     names = ('system', 'scenario', 'starting_assessment', 'peer_message', 'stance_probe', 'generate_argument', 'select_argument', 'conversational_argument', 'combined_fixed', 'combined_reasoning', 'open_discussion', 'topic_discussion', 'topic_system', 'topic_probe', 'discussion_then_decision', 'joint_task', 'closure', 'exploration_system', 'exploration_response', 'exploration_probe', 'exploration_deliberation')
-    names += ('qa_system', 'qa_initial', 'qa_response', 'qa_probe', 'qa_peer_message')
+    names += ('qa_system', 'qa_initial', 'qa_response', 'qa_probe', 'qa_peer_message', 'qa_response_decision')
     return {name: input_path('prompts/' + name + '.txt', ROOT).read_text() for name in names}
 
 def initial(scenario, texts, order='strategy_1_first', agents=2, persona=None, agent_name=None, prompt_style="original", joint_task_brief=None):

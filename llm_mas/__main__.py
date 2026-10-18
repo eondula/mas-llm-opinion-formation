@@ -31,6 +31,8 @@ def main():
         parser.add_argument('--dry-run',action='store_true')
         parser.add_argument('--repetitions', type=int, help='Independent realizations per configuration/task')
         parser.add_argument('--seed', type=int, help='Base seed for sampled generation')
+    png=sub.add_parser('question-figures',help='Export single-repetition question PNGs to a separate directory; no model inference')
+    png.add_argument('--run-id',required=True);png.add_argument('--output',required=True)
     reports=sub.add_parser('reports',help='Regenerate saved StrategyQA reports without model inference')
     report_target=reports.add_mutually_exclusive_group(required=True);report_target.add_argument('--run-id');report_target.add_argument('--all',action='store_true')
     behavioral=sub.add_parser('behavioral',help='Analyze a saved StrategyQA experiment without model inference');behavioral.add_argument('--run-id',required=True)
@@ -54,13 +56,18 @@ def main():
         info=download(ROOT) if args.action=='download' else describe(ROOT)
         print(json.dumps({key:value for key,value in info.items() if key!='questions'},indent=2))
         return
+    if args.command=='question-figures':
+        from .question_figures import report
+        source=run_path(args.run_id);destination=Path(args.output).resolve()
+        if destination.exists() or source.resolve() in destination.parents or destination in source.resolve().parents or destination==source.resolve():p.error('Choose a new output directory separate from the saved experiment')
+        report(source,output=destination);print(destination/'index.html');return
     if args.command=='reports':
         from .behavioral_reports import generate, rebuild_all, compare_experiments
         if args.all:
             rebuild_all(ROOT)
         else:
             folder=run_path(args.run_id);generate(folder)
-            if folder.parent.name=='experiments':compare_experiments(folder.parent)
+            if folder.parent.name=='experiments' and json.loads((folder/'config.json').read_text()).get('question_figure_profile')!='question_png':compare_experiments(folder.parent)
             print(folder/'index.html')
         return
     if args.command=='behavioral':
@@ -69,7 +76,7 @@ def main():
         message_analysis(folder)
         from .behavioral_reports import generate, compare_experiments
         generate(folder)
-        if folder.parent.name=='experiments':compare_experiments(folder.parent)
+        if folder.parent.name=='experiments' and json.loads((folder/'config.json').read_text()).get('question_figure_profile')!='question_png':compare_experiments(folder.parent)
         print(folder/'index.html')
         return
     if args.command=='analyze-c':
@@ -99,7 +106,7 @@ def main():
         if json.loads((folder/'config.json').read_text()).get('dataset'):
             from .behavioral_reports import generate, compare_experiments
             generate(folder)
-            if folder.parent.name=='experiments':compare_experiments(folder.parent)
+            if folder.parent.name=='experiments' and json.loads((folder/'config.json').read_text()).get('question_figure_profile')!='question_png':compare_experiments(folder.parent)
         return
     if args.command=='resume': raw=json.loads((run_path(args.run_id)/'config.json').read_text())
     elif args.command in ('run', 'study'):

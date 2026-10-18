@@ -109,13 +109,13 @@ function draw(index){
  bubbleFrames.set(name,frame);
  node.querySelector('.bubble').classList.toggle('has-response',Boolean(shown));node.querySelector('.circle').className='circle '+(row?.strategy!=null?'s'+row.strategy:'unknown');
  node.querySelector('.strategy-label').textContent=row?(row.answer??(row.strategy==null?'Invalid generated choice':'Strategy '+row.strategy)):'No answer yet';node.querySelector('.forced').textContent=row?.forced?'Forced start':row?(row.choice_status==='valid'?'Generated choice':row.strategy==null?'':settings?.decision_mode==='generated'?'Generated choice':'Stance-derived choice'):'';
- node.querySelector('.activity').textContent=row?`Round ${row.round} · stance ${fmt(row.post.stance)} · margin ${fmt(row.post.margin)}${typeof row.correct==='boolean'?(row.correct?' · correct':' · incorrect'):''}`:'Waiting';node.querySelector('.message').title=row?.model||'';
+ node.querySelector('.activity').textContent=row?`Round ${row.round} · stance ${fmt((row.decision_time||row.post).stance)} · margin ${fmt((row.decision_time||row.post).margin)}${typeof row.correct==='boolean'?(row.correct?' · correct':' · incorrect'):''}`:'Waiting';node.querySelector('.message').title=row?.model||'';
  if(n===2&&i===0)arena.insertBefore(node,arena.querySelector('.exchange'));else arena.append(node);
  });
  drawJointSheet(subset,settings,n,current);
  $('round').textContent=subset.length?'Round '+subset.at(-1).row.round:'Round —';$('checkpoint-label').textContent=$('round').textContent;
  $('delivery').textContent='';$('delivery').hidden=true;
- chart('stance-chart',all.length?Object.fromEntries(names.map(name=>[name,all.filter(e=>e.row.agent===name).map(e=>e.row.post.stance)])):null,'Post-response stance');
+ chart('stance-chart',all.length?Object.fromEntries(names.map(name=>[name,all.filter(e=>e.row.agent===name).map(e=>(e.row.decision_time||e.row.post).stance)])):null,all.some(e=>e.row.decision_time)?'Decision-time stance':'Post-response probe stance');
  const sent=all.some(e=>typeof e.row.sentiment==='number');chart('sentiment-chart',sent?Object.fromEntries(names.map(name=>[name,all.filter(e=>e.row.agent===name).map(e=>e.row.sentiment)])):null,'Sentiment available after scoring');
  const legend=document.querySelector('.legend');legend.replaceChildren();names.forEach((name,i)=>{const span=document.createElement('span');span.textContent=name;span.style.color=agentColor(i);legend.append(span);});
  requestAnimationFrame(drawLinks);

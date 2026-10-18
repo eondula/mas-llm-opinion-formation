@@ -104,7 +104,7 @@ class Runtime:
         from .measurement import measure
         return measure(self, history, scenario, texts)
 
-    def generate(self, messages, max_tokens, continuation_prefix='', sampling=None):
+    def generate(self, messages, max_tokens, continuation_prefix='', sampling=None, allow_empty=False):
         rendered, inputs = self.inputs(messages, continuation_prefix)
         self.check_context(inputs.input_ids.shape[1], reserve_tokens=max_tokens)
         options = dict(do_sample=bool(sampling), num_beams=1)
@@ -115,8 +115,14 @@ class Runtime:
             output = self.model.generate(**inputs, max_new_tokens=max_tokens, **options,
                                          pad_token_id=self.tokenizer.eos_token_id)
         text = self.tokenizer.decode(output[0][inputs.input_ids.shape[1]:], skip_special_tokens=True).strip()
-        if not text: raise ValueError('Empty generated argument')
-        return dict(output=text, generated_tokens=int(output.shape[1]-inputs.input_ids.shape[1]), rendered_prompt=rendered + continuation_prefix, continuation_prefix=continuation_prefix, max_new_tokens=max_tokens, **options, **({'seed':sampling['seed']} if sampling else {}))
+        if not text and not allow_empty: raise ValueError('Empty generated argument')
+        count=int(output.shape[1]-inputs.input_ids.shape[1])
+        eos=int(output[0,-1])==self.tokenizer.eos_token_id
+        return dict(output=text, generated_tokens=count, finish_reason='eos' if eos else 'length' if count>=max_tokens else 'other', rendered_prompt=rendered + continuation_prefix, continuation_prefix=continuation_prefix, max_new_tokens=max_tokens, **options, **({'seed':sampling['seed']} if sampling else {}))
+
+    def generate_binary_response(self, messages, max_tokens, sampling=None, assigned=None):
+        from .decision_generation import generate
+        return generate(self,messages,max_tokens,sampling,assigned)
 
     def select_argument(self, history, selected, texts):
         """Constrained deterministic choice among numbered argument entries."""
