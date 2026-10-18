@@ -41,6 +41,42 @@ def boolq_partition(archive, partition):
     return json.dumps(rows, ensure_ascii=False, separators=(',', ':')).encode()
 
 
+def proofwriter_statement(text):
+    text = text.strip().rstrip('.')
+    return 'the'+text[3:] if text.startswith('The ') else text
+
+
+def proofwriter_partition(archive, partition):
+    """ProofWriter OWA depth-3 official test split, True/False items only (Unknown dropped).
+
+    Agents see the facts and rules plus one Yes/No question; the gold proof, the sentences it
+    uses and its intermediate conclusions are stored for analysis and never shown to agents.
+    """
+    import ast
+    import re
+    rows = []
+    for line in archive.read('proofwriter-dataset-V2020.12.3/OWA/depth-3/meta-test.jsonl').decode().splitlines():
+        theory = json.loads(line)
+        sentences = {**{k: v['text'] for k, v in theory['triples'].items()}, **{k: v['text'] for k, v in theory['rules'].items()}}
+        for key, item in theory['questions'].items():
+            if item['answer'] not in (True, False):
+                continue
+            proofs = item['proofsWithIntermediates']
+            proofs = ast.literal_eval(proofs) if isinstance(proofs, str) else proofs
+            proof = proofs[0]
+            used = list(dict.fromkeys(re.findall(r'(triple\d+|rule\d+)', proof['representation'])))
+            intermediates = proof.get('intermediates') or {}
+            statement = proofwriter_statement(item['question'])
+            rows.append(dict(qid=f'proofwriter-d{item["QDep"]}-{theory["id"]}-{key}',
+                             question=f'Facts and rules:\n{theory["theory"]}\n\nBased only on these facts and rules, is it true that {statement}?',
+                             summary=f'[depth {item["QDep"]}] Is it true that {statement}?', answer=item['answer'],
+                             depth=item['QDep'], statement=item['question'], theory_id=theory['id'], strategy=item['strategy'],
+                             proof=proof['representation'], proof_sentences=[sentences[k] for k in used],
+                             intermediate_conclusions=[intermediates[k]['text'] for k in sorted(intermediates, key=lambda k: -int(k[3:]))],
+                             alternative_proofs=len(proofs)-1))
+    return json.dumps(rows, ensure_ascii=False, separators=(',', ':')).encode()
+
+
 # SuperGLUE v2 release of BoolQ (Clark et al., 2019); the original storage.googleapis.com/boolq files are no longer public.
 DATASETS = {
     'strategyqa': dict(label='StrategyQA', source_url=SOURCE_URL, release_sha256=RELEASE_SHA256, partition_sha256=PARTITION_SHA256,
@@ -48,6 +84,10 @@ DATASETS = {
     'boolq': dict(label='BoolQ', source_url='https://dl.fbaipublicfiles.com/glue/superglue/data/v2/BoolQ.zip',
                   release_sha256='853fbe7922f70c59629f06a39e8d9ca440c3d740e760fd3b87a5ddf3dcba2436',
                   partition_sha256={'train': 'f0ba5ec63c4621c499b2d9725a7d2e7bf07977681ddb189d3f388abaa65a9a90', 'test': '08eee1227567396a0fedfd532a088037318406e0972ca2599c531ae38953f463'}, extract=boolq_partition),
+    # ProofWriter (Tafjord et al., 2021) V2020.12.3; the labeled pool is the official OWA depth-3 test split.
+    'proofwriter': dict(label='ProofWriter', source_url='https://aristo-data-public.s3.amazonaws.com/proofwriter/proofwriter-dataset-V2020.12.3.zip',
+                        release_sha256='bbc5694901e8306d0bd659aa1ad53ccfd02c201864f4b320ffa3777827d1fc26',
+                        partition_sha256={'train': 'df0889836e6c7026559636fc4ee4308d1fc8a926300b73b994c26874e811348a'}, extract=proofwriter_partition),
 }
 
 
@@ -73,7 +113,7 @@ def download(root, name='strategyqa'):
         raise ValueError(f'{spec["label"]} release checksum changed; inspect before updating the pinned release')
     folder.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
-        for partition in ('train', 'test'):
+        for partition in spec['partition_sha256']:
             filename = f'{name}_{partition}.json'
             data = spec['extract'](archive, partition)
             # Validate before replacing an installed dataset file.
@@ -107,8 +147,8 @@ def load(root, spec=None):
     pinned = source(name)
     label = pinned['label']
     partition = spec.get('partition', 'train')
-    if partition not in ('train', 'test'):
-        raise ValueError(f'{label} source partition must be train or test')
+    if partition not in pinned['partition_sha256']:
+        raise ValueError(f'{label} source partition must be one of: '+', '.join(pinned['partition_sha256']))
     folder = Path(spec.get('path', f'data/{name}'))
     if not folder.is_absolute():
         folder = Path(root) / folder
@@ -120,10 +160,17 @@ def load(root, spec=None):
         raise ValueError(f'{label} file changed since the saved configuration')
     rows = json.loads(data)
     validate_records(rows, partition, label)
+    depths = spec.get('proof_depths')
+    if depths is not None:
+        if name != 'proofwriter' or not isinstance(depths, list) or not depths or any(type(d) is not int or not 0 <= d <= 3 for d in depths):
+            raise ValueError('proof_depths applies only to ProofWriter: a nonempty list of depths 0-3')
+        rows = [row for row in rows if row['depth'] in depths]
     metadata = dict(name=name, path=str(folder.relative_to(root)) if folder.is_relative_to(root) else str(folder),
                     partition=partition, source_url=pinned['source_url'], release_sha256=pinned['release_sha256'],
                     source_sha256=sha(data), release_verified=sha(data) == pinned['partition_sha256'][partition],
                     split_version=SPLIT_VERSION)
+    if depths is not None:
+        metadata['proof_depths'] = sorted(depths)
     return rows, metadata
 
 
@@ -193,9 +240,12 @@ def labels(root, spec):
     return {row['qid']: 'Yes' if row['answer'] else 'No' for row in rows if 'answer' in row}
 
 
-def describe(root, partition='train', split='train', split_seed=42, name='strategyqa'):
-    rows, metadata = load(root, dict(name=name, partition=partition))
+def describe(root, partition='train', split='train', split_seed=42, name='strategyqa', proof_depths=None):
+    spec = dict(name=name, partition=partition)
+    if proof_depths is not None:
+        spec['proof_depths'] = proof_depths
+    rows, metadata = load(root, spec)
     assignments = split_assignments(rows, split_seed, partition)
     return dict(metadata=metadata, labeled=sum('answer' in r for r in rows), total=len(rows),
                 splits={s: sum(value == s for value in assignments.values()) for s in sorted(set(assignments.values()))},
-                questions=[dict(id=r['qid'], question=r['question']) for r in rows if split == 'all' or assignments[r['qid']] == split])
+                questions=[dict(id=r['qid'], question=r.get('summary', r['question'])) for r in rows if split == 'all' or assignments[r['qid']] == split])

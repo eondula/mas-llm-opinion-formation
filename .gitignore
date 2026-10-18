@@ -47,6 +47,7 @@ outputs/
 .refactor-backups/
 /data/strategyqa/*.json
 /data/boolq/*.json
+/data/proofwriter/*.json
 /data/strategyqa/*.zip
 !/data/strategyqa/source.json
 

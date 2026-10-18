@@ -170,7 +170,8 @@ def serve(port=8766):
                     query=parse_qs(parsed.query)
                     return self.send(describe(ROOT,query.get('partition',['train'])[0],
                                               query.get('split',['train'])[0],int(query.get('split_seed',['42'])[0]),
-                                              query.get('dataset',['strategyqa'])[0]))
+                                              query.get('dataset',['strategyqa'])[0],
+                                              [int(d) for d in query['proof_depths'][0].split(',') if d.strip()] if query.get('proof_depths',[''])[0] else None))
                 if parsed.path=='/api/scenarios':
                     entries=[]
                     if parse_qs(parsed.query).get('archived') != ['1']:
