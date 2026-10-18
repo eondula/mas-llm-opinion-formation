@@ -1,0 +1,3 @@
+# Install into the project .venv: .venv/bin/pip install -r large_model_experiment/requirements.txt
+anthropic==1.15.0
+openai==3.35.1
