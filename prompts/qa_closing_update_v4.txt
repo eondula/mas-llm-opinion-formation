@@ -1,0 +1,8 @@
+End with exactly two lines:
+Answer: Yes  (or Answer: No)
+Next: continue  (or Next: finish)
+
+Choose continue if a delivered peer message raises a question, objection, or disputed reasoning step that you have not addressed, or if your response introduces a correction or claim that needs a reply.
+Choose finish only when you have addressed the relevant points delivered by your peers and have no remaining question or correction to exchange. Stating your own position is not sufficient.
+Disagreement may remain at finish, but first identify the exact remaining point and explain why further exchange is unlikely to resolve it using the available information.
+Write Next only once, on the final line. Do not include continuation decisions inside your reasoning.

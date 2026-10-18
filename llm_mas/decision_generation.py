@@ -8,7 +8,8 @@ PARSER='application-serialized-answer-v2'
 REASONING_VERSION='answer-token-logits-after-reasoning-v1'
 REASONING_PARSER='reasoning-then-answer-v1'
 # Protocols whose primary stance is the raw Yes/No answer-token score.
-DECISION_PROTOCOLS=('decision_time_v2','reasoning_answer_v3')
+REASONING_PROTOCOLS=('reasoning_answer_v3','reasoning_answer_v4')
+DECISION_PROTOCOLS=('decision_time_v2',*REASONING_PROTOCOLS)
 # Explicit greedy-compatible settings; checkpoint generation_config defaults
 # (for example Qwen2.5's repetition_penalty=1.1) are not inherited.
 EXPLICIT_DECODING=dict(num_beams=1,repetition_penalty=1.,no_repeat_ngram_size=0)
@@ -89,7 +90,18 @@ def select_answer(runtime,inputs,ids,sampling=None,assigned=None,labels=('Yes','
     return answer,options,measurement
 
 
-def split_reasoning(text):
+NEXT_CONTROL=re.compile(r'(?i)(?<!\w)(?:\*{1,2})?next(?:\*{1,2})?\s*:\s*(?:\*{1,2})?[ \t]*(continue|finish)\b(?:\*{1,2})?[.!?]?')
+
+
+def strip_next_controls(text):
+    """Remove recognized continuation controls, preserving other reasoning and raw audits."""
+    clean=NEXT_CONTROL.sub('',text)
+    clean=re.sub(r'[ \t]{2,}',' ',clean)
+    clean=re.sub(r'[ \t]+\n','\n',clean)
+    return clean.strip()
+
+
+def split_reasoning(text,clean_next=False):
     """Public reasoning precedes the first answer marker; a leading answer line is dropped."""
     matches=list(ANSWER_MARKER.finditer(text))
     first=matches[0] if matches else None
@@ -101,10 +113,21 @@ def split_reasoning(text):
         matches=[m for m in matches if m.start()>=start]
     marker=matches[0] if matches else None
     raw=text[start:marker.start() if marker else len(text)].strip()
-    reasoning=NEXT_LINE.sub('',raw).strip()
+    reasoning=strip_next_controls(raw) if clean_next else NEXT_LINE.sub('',raw).strip()
     stated=re.match(r'[\s*_]*(yes|no)\b',text[first.end():],re.I) if first else None
     return dict(reasoning=reasoning,raw_reasoning=raw,marker_found=marker is not None,answer_before_reasoning=answer_first,
                 next_before_answer=reasoning!=raw,stated_answer=stated.group(1).capitalize() if stated else None)
+
+
+def parse_next_action(text):
+    """Accept only one terminal Next line following the final answer marker."""
+    markers=list(ANSWER_MARKER.finditer(text))
+    if not markers:return None
+    tail=text[markers[-1].end():]
+    answer=re.match(r'[ \t*_]*(?:yes|no)\b[^\n]*\n(.*)\Z',tail,re.I|re.S)
+    if not answer:return None
+    control=re.fullmatch(r'[ \t*_>-]*next[ \t*_]*:[ \t*_]*(continue|finish)[ \t*_]*[.!]?',answer.group(1).strip(),re.I)
+    return control.group(1).lower() if control else None
 
 
 def answer_marker_stop(tokenizer,prompt_length,torch):
@@ -119,7 +142,7 @@ def answer_marker_stop(tokenizer,prompt_length,torch):
     return AnswerMarkerStop()
 
 
-def generate_reasoning_first(runtime,messages,max_tokens,own_messages,exempt,copy_block_ngram,sampling=None,assigned=None,next_choice=False):
+def generate_reasoning_first(runtime,messages,max_tokens,own_messages,exempt,copy_block_ngram,sampling=None,assigned=None,next_choice=False,clean_next=False):
     """Generate public reasoning, then score the Yes/No token after an appended answer marker."""
     from .copy_block import OwnMessageNgramBlock
     if max_tokens<2:raise ValueError('Reasoning-first responses require at least two tokens')
@@ -132,7 +155,7 @@ def generate_reasoning_first(runtime,messages,max_tokens,own_messages,exempt,cop
     reasoning_sampling=dict(sampling) if sampling else None
     raw=runtime.generate(messages,max_tokens-1,sampling=reasoning_sampling,allow_empty=True,decoding=EXPLICIT_DECODING,
                          logits_processor=[block] if block else None,stopping_criteria=[answer_marker_stop(runtime.tokenizer,prompt_length,torch)])
-    parsed=split_reasoning(raw['output'])
+    parsed=split_reasoning(raw['output'],clean_next=clean_next)
     reasoning=parsed['reasoning']
     prefix=(reasoning+'\n' if reasoning else '')+'Answer:'
     rendered,inputs=runtime.inputs(messages,prefix)
@@ -156,7 +179,7 @@ def generate_reasoning_first(runtime,messages,max_tokens,own_messages,exempt,cop
                     banned_ngrams=block.banned_ngrams if block else 0,blocked_steps=block.blocked_steps if block else 0)
     generation=dict(output=raw['output'],complete_output=json.dumps(dict(answer=answer,explanation=reasoning),ensure_ascii=False),
         generated_tokens=raw['generated_tokens']+1,max_new_tokens=max_tokens,
-        choice_parser_version=REASONING_PARSER,serialization='reasoning generated first; answer token scored after an appended "Answer:" marker',
+        choice_parser_version='reasoning-then-answer-v2' if clean_next else REASONING_PARSER,serialization='reasoning generated first; answer token scored after an appended "Answer:" marker',
         sampling=sampling,seed=sampling['seed'] if sampling else None,
         answer_token=answer,answer_seed=answer_sampling['seed'] if answer_sampling else None,
         reasoning_generation=raw,raw_reasoning_output=raw['output'],reasoning=reasoning,
@@ -167,7 +190,8 @@ def generate_reasoning_first(runtime,messages,max_tokens,own_messages,exempt,cop
         decoding=dict(EXPLICIT_DECODING,do_sample=bool(sampling)),copy_block=copy_block,
         hit_token_limit=raw['generated_tokens']>=max_tokens-1,
         reasoning_truncated=raw.get('finish_reason')=='length',rendered_prompt=raw['rendered_prompt'],
-        continuation_prefix='',answer_options=options,next_action=next_action)
+        continuation_prefix='',answer_options=options,next_action=next_action,
+        next_control_cleanup=dict(enabled=clean_next,removed=len(NEXT_CONTROL.findall(parsed['raw_reasoning'])) if clean_next else 0))
     return dict(answer=answer,argument=reasoning,message=message,measurement=measurement,generation=generation,
                 next_action=next_action,next_measurement=next_measurement)
 

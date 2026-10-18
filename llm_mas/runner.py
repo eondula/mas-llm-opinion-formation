@@ -171,7 +171,7 @@ def execute(raw, name=None, resume=False, launch_token=None):
                 record = dict(schema_version=SCHEMA_VERSION, config=execution, scenario=scenario,
                               question_id=scenario['id'], repetition=active.get('repetition', 0),
                               measurement_stages=dict(before='before_peer_delivery',
-                                  decision='answer_token_after_reasoning' if config.get('response_protocol')=='reasoning_answer_v3' else 'public_answer_token_before_explanation' if config.get('response_protocol')=='decision_time_v2' else 'after_peer_delivery_and_optional_discussion', post='after_public_response_probe',primary='decision_time' if config.get('response_protocol') in DECISION_PROTOCOLS else 'post'),
+                                  decision='answer_token_after_reasoning' if config.get('response_protocol') in ('reasoning_answer_v3','reasoning_answer_v4') else 'public_answer_token_before_explanation' if config.get('response_protocol')=='decision_time_v2' else 'after_peer_delivery_and_optional_discussion', post='after_public_response_probe',primary='decision_time' if config.get('response_protocol') in DECISION_PROTOCOLS else 'post'),
                               rows=rows, termination=termination)
                 if snapshot:
                     record.update(pair_id=snapshot['pair_id'],initialization_hash=snapshot['initialization_hash'],control_design='shared_initialization',protocol_hash=protocol_hash)

@@ -133,9 +133,9 @@ class Runtime:
         from .decision_generation import generate
         return generate(self,messages,max_tokens,sampling,assigned)
 
-    def generate_reasoning_response(self, messages, max_tokens, own_messages, exempt, copy_block_ngram, sampling=None, assigned=None, next_choice=False):
+    def generate_reasoning_response(self, messages, max_tokens, own_messages, exempt, copy_block_ngram, sampling=None, assigned=None, next_choice=False,clean_next=False):
         from .decision_generation import generate_reasoning_first
-        return generate_reasoning_first(self,messages,max_tokens,own_messages,exempt,copy_block_ngram,sampling,assigned,next_choice)
+        return generate_reasoning_first(self,messages,max_tokens,own_messages,exempt,copy_block_ngram,sampling,assigned,next_choice,clean_next)
 
     def select_argument(self, history, selected, texts):
         """Constrained deterministic choice among numbered argument entries."""

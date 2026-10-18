@@ -76,15 +76,14 @@ $('scenario-form').onsubmit=async event=>{
 };
 
 let selectedTask=null, following=true, timer=null, currentRun=null, activeConfig=null, activeTasks=[], lastPhase=null;
-let viewVersion=0,requestedRun=null,pollAgain=false,pollController=null;
+let viewVersion=0,requestedRun=null,pollAgain=false,pollController=null,currentFrame=null;
 const names=[];
 const fmt=n=>typeof n==='number'?n.toFixed(3):'—';
 $('theme-toggle').onclick=()=>{const dark=document.documentElement.dataset.theme!=='dark';document.documentElement.dataset.theme=dark?'dark':'light';$('theme-toggle').textContent=dark?'Light theme':'Dark theme';localStorage.setItem('opinion-lab-theme',dark?'dark':'light');draw(lastIndex);};
 document.documentElement.dataset.theme=localStorage.getItem('opinion-lab-theme')||'light';
 $('theme-toggle').textContent=document.documentElement.dataset.theme==='dark'?'Light theme':'Dark theme';
 const agentTemplate=$('agent-a').cloneNode(true);
-function updateHeading(){
- const task=selectedTask||events[lastIndex]?.task;
+function updateHeading(task=selectedTask||events[lastIndex]?.task){
  if(!task)return;
  const [conditionIndex,scenarioIndex]=task.split('_').map(Number);
  const scenario=activeConfig?.scenarios?.[scenarioIndex];
@@ -97,10 +96,9 @@ function updateHeading(){
 function agentColor(index){return `hsl(${(25+360*index/Math.max(2,names.length))%360} 58% 48%)`;}
 const bubbleFrames=new Map();
 function draw(index){
- updateHeading();
- const current=selectedTask||events[index]?.task, subset=events.slice(0,index+1).filter(e=>e.task===current), seen={};
- for(const e of subset)seen[e.row.agent]=e.row;
- const all=subset;
+ const frame=conversationFrame(events,index,selectedTask);
+ const current=frame.task,subset=frame.events;
+ updateHeading(current);
  const taskIndex=Number((current||'0').split('_')[0]);
  const settings=activeTasks[taskIndex]||activeConfig;
  const n=settings?.agents||Number($('agents').value);
@@ -109,30 +107,31 @@ function draw(index){
  if($('positive-choice-label'))$('positive-choice-label').textContent=questionRun?'Yes':'S1';
  if($('negative-choice-label'))$('negative-choice-label').textContent=questionRun?'No':'S2';
  names.splice(0,names.length,...Array.from({length:n},(_,i)=>i<26?`Agent ${String.fromCharCode(65+i)}`:`Agent ${i+1}`));
- const visible=responseFrame(events,index,current,settings||{agents:n,schedule:$('schedule').value});
+ frame.settings=settings||{agents:n,schedule:$('schedule').value};
+ currentFrame=frame;
  const arena=$('arena');arena.querySelectorAll('.agent').forEach(e=>e.remove());arena.classList.toggle('many-agents',n>2);arena.classList.toggle('single-agent',n===1);arena.style.setProperty('--agent-scale',Number($('size').value)/100);
  arena.style.minHeight='';
- names.forEach((name,i)=>{const row=seen[name],node=agentTemplate.cloneNode(true);node.id='study-agent-'+i;node.style.setProperty('--agent-color',agentColor(i));node.style.setProperty('--motion-delay',`${-i*.7}s`);node.className='agent '+(i%2?'right':'left');
+ names.forEach((name,i)=>{const row=frame.rows.find(row=>row.agent===name),node=agentTemplate.cloneNode(true);node.id='study-agent-'+i;node.style.setProperty('--agent-color',agentColor(i));node.style.setProperty('--motion-delay',`${-i*.7}s`);node.className='agent '+(i%2?'right':'left');
  node.querySelector('.speaker').textContent=name;node.querySelector('.name').textContent=name;node.querySelector('.message').textContent=row?.message||'';
- const active=visible.find(r=>r.agent===name);
- const shown=active;
+ const shown=row;
+ const active=row&&row.round===frame.round;
  node.classList.toggle('is-active',Boolean(active));node.querySelector('.message').textContent=shown?.display_message ?? (shown?.choice_status==='valid'?`Strategy ${shown.strategy}\n${shown.argument}`:shown?.message||'');
  const bubble=node.querySelector('.bubble');
- const frame=shown?JSON.stringify([currentRun,current,name,shown.round,shown.message]):null;
+ const bubbleKey=shown?JSON.stringify([currentRun,current,name,shown.round,shown.message]):null;
  bubble.classList.toggle('has-response',Boolean(shown));
- bubble.classList.toggle('response-pop',Boolean(shown)&&bubbleFrames.get(name)!==frame);
- bubbleFrames.set(name,frame);
+ bubble.classList.toggle('response-pop',Boolean(shown)&&bubbleFrames.get(name)!==bubbleKey);
+ bubbleFrames.set(name,bubbleKey);
  node.querySelector('.bubble').classList.toggle('has-response',Boolean(shown));node.querySelector('.circle').className='circle '+(row?.strategy!=null?'s'+row.strategy:'unknown');
  node.querySelector('.strategy-label').textContent=row?(row.answer??(row.strategy==null?'Invalid generated choice':'Strategy '+row.strategy)):'No answer yet';node.querySelector('.forced').textContent=row?.forced?'Forced start':row?(row.choice_status==='valid'?'Generated choice':row.strategy==null?'':settings?.decision_mode==='generated'?'Generated choice':'Stance-derived choice'):'';
  node.querySelector('.activity').textContent=row?`Round ${row.round} · stance ${fmt((row.decision_time||row.post||{}).stance)} · margin ${fmt((row.decision_time||row.post||{}).margin)}${typeof row.correct==='boolean'?(row.correct?' · correct':' · incorrect'):''}${row.next_action?' · next: '+row.next_action:''}`:'Waiting';node.querySelector('.message').title=row?.model||'';
  if(n===2&&i===0)arena.insertBefore(node,arena.querySelector('.exchange'));else arena.append(node);
  });
  drawJointSheet(subset,settings,n,current);
- const latestRound=subset.at(-1)?.row.round,roundRows=subset.filter(e=>e.row.round===latestRound);
+ const latestRound=frame.round,roundRows=subset.filter(e=>e.row.round===latestRound);
  $('round').textContent=subset.length?'Round '+latestRound+(settings?.schedule==='synchronous'&&roundRows.length<n?' · '+roundRows.length+'/'+n+' responses':''):'Round —';$('checkpoint-label').textContent=$('round').textContent;
  $('delivery').textContent='';$('delivery').hidden=true;
- chart('stance-chart',all.length?Object.fromEntries(names.map(name=>[name,all.filter(e=>e.row.agent===name).map(e=>(e.row.decision_time||e.row.post||{}).stance)])):null,all.some(e=>e.row.decision_time)?'Decision-time stance':'Post-response probe stance');
- const sent=all.some(e=>typeof e.row.sentiment==='number');chart('sentiment-chart',sent?Object.fromEntries(names.map(name=>[name,all.filter(e=>e.row.agent===name).map(e=>e.row.sentiment)])):null,'Sentiment available after scoring');
+ chart('stance-chart',plotSeries(frame,names,'stance'),subset.some(e=>e.row.decision_time)?'Decision-time stance':'Post-response probe stance',frame.round);
+ chart('sentiment-chart',plotSeries(frame,names,'sentiment'),'Sentiment available after scoring',frame.round);
  const legend=document.querySelector('.legend');legend.replaceChildren();names.forEach((name,i)=>{const span=document.createElement('span');span.textContent=name;span.style.color=agentColor(i);legend.append(span);});
  requestAnimationFrame(drawLinks);
 }
@@ -174,9 +173,8 @@ function drawLinks(){
  const canvas=$('exchange-canvas'),rect=$('arena').getBoundingClientRect(),ratio=devicePixelRatio||1;
  canvas.width=rect.width*ratio;canvas.height=rect.height*ratio;
  const ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);
- const event=events[lastIndex];
- const settings=activeTasks[Number((selectedTask||'0').split('_')[0])]||activeConfig||{};
- const deliveries=deliveryFrame(events,lastIndex,selectedTask,settings); 
+ const frame=currentFrame;
+ const deliveries=frame?deliveryFrame(frame.events,frame.events.length-1,frame.task,frame.settings):[];
  const curves=[];
  for(const delivery of deliveries){
   const from=names.indexOf(delivery.speaker),to=names.indexOf(delivery.receiver);
@@ -188,7 +186,7 @@ function drawLinks(){
   curves.push({sx:x+Math.cos(start)*(a.width/2+4),sy:y+Math.sin(start)*(a.height/2+4),cx,cy,ex:xx-Math.cos(end)*(b.width/2+7),ey:yy-Math.sin(end)*(b.height/2+7),end});
  }
  $('delivery').textContent='';$('delivery').hidden=true;
- const deliveryKey=JSON.stringify([currentRun,selectedTask,lastIndex,deliveries]);
+ const deliveryKey=JSON.stringify([currentRun,frame?.task,frame?.cursor,deliveries]);
  const animate=deliveryKey!==lastAnimatedDelivery&&!['complete','failed','cancelled'].includes(lastPhase);lastAnimatedDelivery=deliveryKey;
  const began=performance.now(),reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
  function paint(now){ctx.clearRect(0,0,rect.width,rect.height);ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--exchange');ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=2;
@@ -198,13 +196,40 @@ function drawLinks(){
  }paint(began);
 }
 $('size').oninput=()=>draw(lastIndex);window.addEventListener('resize',drawLinks);
-$('checkpoint').oninput=()=>{following=false;lastIndex=Number($('checkpoint').value);selectedTask=events[lastIndex]?.task;$('condition').value=selectedTask||'';$('follow').textContent='Follow live';draw(lastIndex);};
-$('follow').onclick=()=>{if(timer){clearInterval(timer);timer=null;}$('play').textContent='Play responses';following=true;$('follow').textContent='Following live';lastIndex=Math.max(0,events.length-1);selectedTask=events[lastIndex]?.task;$('condition').value=selectedTask||'';$('checkpoint').value=lastIndex;draw(lastIndex);};
-$('condition').onchange=()=>{if(timer){clearInterval(timer);timer=null;}$('play').textContent='Play responses';$('follow').textContent='Follow live';selectedTask=$('condition').value;following=false;lastIndex=Math.max(0,events.map(e=>e.task).lastIndexOf(selectedTask));$('checkpoint').value=lastIndex;draw(lastIndex);};
-$('play').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('play').textContent='Play responses';return;}following=false;const indices=events.map((e,i)=>e.task===selectedTask?i:-1).filter(i=>i>=0);let at=0;timer=setInterval(()=>{if(at>=indices.length){clearInterval(timer);timer=null;$('play').textContent='Play responses';return;}lastIndex=indices[at++];$('checkpoint').value=lastIndex;draw(lastIndex);},Number($('playback-speed').value));$('play').textContent='Pause';};
+function stopPlayback(){
+ if(timer){clearInterval(timer);timer=null;}
+ $('play').textContent='Play responses';
+}
+$('checkpoint').oninput=()=>{
+ stopPlayback();following=false;lastIndex=Number($('checkpoint').value);selectedTask=events[lastIndex]?.task;
+ $('condition').value=selectedTask||'';$('follow').textContent='Follow live';draw(lastIndex);
+};
+$('follow').onclick=()=>{
+ stopPlayback();following=true;$('follow').textContent='Following live';lastIndex=Math.max(0,events.length-1);
+ selectedTask=events[lastIndex]?.task;$('condition').value=selectedTask||'';$('checkpoint').value=lastIndex;draw(lastIndex);
+};
+$('condition').onchange=()=>{
+ stopPlayback();$('follow').textContent='Follow live';selectedTask=$('condition').value;following=false;
+ lastIndex=Math.max(0,events.map(e=>e.task).lastIndexOf(selectedTask));$('checkpoint').value=lastIndex;draw(lastIndex);
+};
+$('play').onclick=()=>{
+ if(timer){stopPlayback();return;}
+ following=false;$('follow').textContent='Follow live';
+ const task=selectedTask,version=viewVersion,keys=events.filter(e=>e.task===task).map(eventIdentity);let at=0;
+ if(!keys.length)return;
+ const playbackTimer=setInterval(()=>{
+  if(timer!==playbackTimer)return;
+  if(version!==viewVersion||selectedTask!==task){stopPlayback();return;}
+  let index=-1;
+  while(at<keys.length&&index<0){const key=keys[at++];index=events.findIndex(e=>eventIdentity(e)===key);}
+  if(index<0){stopPlayback();return;}
+  lastIndex=index;$('checkpoint').value=lastIndex;draw(lastIndex);
+ },Number($('playback-speed').value));
+ timer=playbackTimer;$('play').textContent='Pause';
+};
 function resetConversation(run=null){
  viewVersion++;requestedRun=run;pollController?.abort();pollAgain=true;
- if(timer){clearInterval(timer);timer=null;}$('play').textContent='Play responses';
+ stopPlayback();
  following=true;currentRun=null;selectedTask=null;events=[];activeConfig=null;activeTasks=[];lastPhase=null;lastIndex=0;
  bubbleFrames.clear();lastAnimatedDelivery=null;$('condition').replaceChildren();
  $('error').textContent='';$('evaluation-summary').textContent='';
@@ -225,7 +250,7 @@ async function poll(){
   if(run&&d.run_id!==run)return;
   const changedRun=d.run_id!==currentRun;
   if(changedRun){
-   if(timer){clearInterval(timer);timer=null;}$('play').textContent='Play responses';
+   stopPlayback();
    selectedTask=null;lastIndex=0;following=true;$('follow').textContent='Following live';bubbleFrames.clear();lastAnimatedDelivery=null;
   }
   activeConfig=d.config;activeTasks=d.tasks||[];renderClosureLog(d.closure_events||[]);
@@ -242,10 +267,12 @@ async function poll(){
   $('timing').textContent=`Elapsed ${Math.round(d.status.elapsed_seconds||0)}s · ETA ${d.status.estimated_remaining_seconds==null?'estimating':Math.round(d.status.estimated_remaining_seconds)+'s'}`;
   lastKnownBusy=Boolean(d.running||d.worker_busy);$('run').disabled=lastKnownBusy||launching||!questionReady;$('stop').disabled=!d.can_stop;
   if(changedRun||JSON.stringify(d.events)!==JSON.stringify(events)||lastPhase!==d.status.phase){
-   lastPhase=d.status.phase;currentRun=d.run_id;events=d.events||[];
+   lastPhase=d.status.phase;currentRun=d.run_id;
+   const previousEvents=events,previousIndex=lastIndex;events=d.events||[];
    const tasks=[...new Set(events.map(e=>e.task))];
    $('condition').replaceChildren(...tasks.map(t=>new Option('Conversation '+t,t)));
    if(following||!tasks.includes(selectedTask)){lastIndex=Math.max(0,events.length-1);selectedTask=events[lastIndex]?.task;}
+   else lastIndex=restoreCheckpoint(previousEvents,events,previousIndex,selectedTask);
    lastIndex=Math.min(lastIndex,Math.max(0,events.length-1));
    $('condition').value=selectedTask||'';$('checkpoint').max=Math.max(0,events.length-1);$('checkpoint').value=lastIndex;
    $('checkpoint').disabled=!events.length;$('play').disabled=!events.length;draw(lastIndex);
@@ -264,17 +291,32 @@ async function poll(){
  }
 }
 setInterval(poll,1000);poll();draw(0);
-function chart(container, trajectories, caption) {
-  const box=$(container);box.replaceChildren();
-  if(!trajectories||!Object.values(trajectories).some(values=>values.some(Number.isFinite))) {const p=document.createElement('p');p.textContent=caption;box.append(p);return;}
-  const ns='http://www.w3.org/2000/svg', W=520,H=235,l=42,r=15,t=20,b=32;
-  const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('role','img');svg.setAttribute('aria-label',caption);
-  const make=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;svg.append(el);return el;};
-  make('desc',{id:container+'-description'},names.map(name=>name+': '+(trajectories[name]||[]).map((v,i)=>'round '+i+' '+fmt(v)).join('; ')).join('. '));svg.setAttribute('aria-describedby',container+'-description');
-  const n=Math.max(...names.map(k=>trajectories[k]?.length||0));const x=i=>l+i/Math.max(n-1,1)*(W-l-r),y=v=>t+(1-v)/2*(H-t-b);
-  for(const v of [-1,0,1]){make('line',{x1:l,y1:y(v),x2:W-r,y2:y(v),stroke:'var(--edge)'});make('text',{x:l-9,y:y(v)+4,'text-anchor':'end','font-size':11,fill:'var(--muted)'},v);}
-  const step=Math.max(1,Math.ceil((n-1)/8));for(let i=0;i<n;i++)if(i%step===0||i===n-1)make('text',{x:x(i),y:H-12,'text-anchor':'middle','font-size':11,fill:'var(--muted)'},i);
-  names.forEach((name,j)=>{const values=trajectories[name]||[],color=agentColor(j);const points=values.map((v,i)=>Number.isFinite(v)?`${x(i)},${y(v)}`:null).filter(Boolean).join(' ');make('polyline',{points,fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':['','6 4','2 3','9 3 2 3'][j%4]});values.forEach((v,i)=>{if(!Number.isFinite(v))return;const dot=make('circle',{cx:x(i),cy:y(v),r:3,fill:color});const title=document.createElementNS(ns,'title');title.textContent=`${name} · round ${i}: ${fmt(v)}`;dot.append(title);});});box.append(svg);
+function chart(container, trajectories, caption, round) {
+ const box=$(container);box.replaceChildren();
+ if(!Object.values(trajectories).some(points=>points.some(p=>Number.isFinite(p.value)))){
+  const p=document.createElement('p');p.textContent=caption;box.append(p);return;
+ }
+ const ns='http://www.w3.org/2000/svg',W=520,H=235,l=42,r=15,t=20,b=32;
+ const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('role','img');svg.setAttribute('aria-label',caption);
+ const make=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;svg.append(el);return el;};
+ make('desc',{id:container+'-description'},names.map(name=>name+': '+(trajectories[name]||[]).map(p=>'round '+p.round+' '+fmt(p.value)).join('; ')).join('. '));svg.setAttribute('aria-describedby',container+'-description');
+ const end=Math.max(0,round??0),x=round=>l+round/Math.max(end,1)*(W-l-r),y=value=>t+(1-value)/2*(H-t-b);
+ for(const value of [-1,0,1]){make('line',{x1:l,y1:y(value),x2:W-r,y2:y(value),stroke:'var(--edge)'});make('text',{x:l-9,y:y(value)+4,'text-anchor':'end','font-size':11,fill:'var(--muted)'},value);}
+ const step=Math.max(1,Math.ceil(end/8));for(let round=0;round<=end;round++)if(round%step===0||round===end)make('text',{x:x(round),y:H-12,'text-anchor':'middle','font-size':11,fill:'var(--muted)'},round);
+ names.forEach((name,j)=>{
+  const points=trajectories[name]||[],color=agentColor(j);let segment=[];
+  const flush=()=>{if(segment.length)make('polyline',{points:segment.join(' '),fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':['','6 4','2 3','9 3 2 3'][j%4]});segment=[];};
+  points.forEach((p,i)=>{
+   if(!Number.isFinite(p.value)){flush();return;}
+   if(i&&p.round!==points[i-1].round+1)flush();
+   segment.push(`${x(p.round)},${y(p.value)}`);
+  });flush();
+  points.forEach((p,i)=>{
+   if(!Number.isFinite(p.value))return;
+   const dot=make('circle',{cx:x(p.round),cy:y(p.value),r:i===points.length-1?4:3,fill:color,'data-agent':name,'data-round':p.round,'data-value':p.value,'data-response-id':p.response_id||''});
+   const title=document.createElementNS(ns,'title');title.textContent=`${name} · round ${p.round}: ${fmt(p.value)}`;dot.append(title);
+  });
+ });box.append(svg);
 }
 
 async function refreshRuns(){
@@ -301,11 +343,27 @@ function deliveryFrame(records,index,task,settings){
 }
 
 function responseFrame(records,index,task,settings){
- // Show every completed agent response immediately. Synchronous scheduling
- // governs delivered context, not when a completed response becomes visible.
- const latest=new Map();
- for(const event of records.slice(0,index+1))if(event.task===task)latest.set(event.row.agent,event.row);
- return [...latest.values()];
+ return conversationFrame(records,index,task).rows;
+}
+function eventIdentity(event){
+ return event?JSON.stringify([event.task,event.row.round,event.row.agent]):null;
+}
+function restoreCheckpoint(previous,records,index,task){
+ const anchor=previous[index];
+ if(anchor?.task===task){const found=records.findIndex(e=>eventIdentity(e)===eventIdentity(anchor));if(found>=0)return found;}
+ return Math.max(0,records.map(e=>e.task).lastIndexOf(task));
+}
+function conversationFrame(records,index,task){
+ const cursor=records[index],current=task||cursor?.task;
+ const visible=records.slice(0,index+1).filter(e=>e.task===current),latest=new Map();
+ for(const event of visible)latest.set(event.row.agent,event.row);
+ return {task:current,cursor:eventIdentity(cursor),events:visible,rows:[...latest.values()],round:visible.at(-1)?.row.round??null};
+}
+function plotSeries(frame,agents,kind){
+ return Object.fromEntries(agents.map(agent=>[agent,frame.events.filter(e=>e.row.agent===agent).map(e=>({
+  round:e.row.round,response_id:e.row.response_id,
+  value:kind==='stance'?(e.row.decision_time||e.row.post||{}).stance:e.row.sentiment
+ }))]));
 }
 
 function syncModels(){

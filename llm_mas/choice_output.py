@@ -44,6 +44,14 @@ def display_message(row):
     """Format parseable generated text without changing the recorded decision."""
     raw = row.get('message', '')
     if 'answer' in row:
+        if row.get('next_action') in ('continue','finish') and row.get('answer') in ('Yes','No'):
+            from .decision_generation import strip_next_controls
+            reasoning=strip_next_controls(row.get('argument') or '')
+            return (reasoning+'\n' if reasoning else '')+'Answer: '+row['answer']+'\nNext: '+row['next_action']
+        # Reasoning-first messages already contain the recorded answer and Next
+        # signal. Keep their exact public order instead of rebuilding answer-first.
+        if (row.get('decision_time') or {}).get('stage') == 'answer_token_after_reasoning' and raw:
+            return raw
         return row['answer']+'\n'+row.get('argument', '') if row.get('answer') in ('Yes','No') else raw
     strategy, explanation, status = parse(raw)
     if status == 'valid':

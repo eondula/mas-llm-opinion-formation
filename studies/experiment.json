@@ -25,6 +25,6 @@
   "question_seed": 42,
   "output_layout": "experiment",
   "message_similarity": true,
-  "response_protocol": "reasoning_answer_v3",
+  "response_protocol": "reasoning_answer_v4",
   "question_figure_profile": "question_png"
 }

@@ -27,7 +27,8 @@ def parse(output):
 class QuestionResponsePolicy:
     def __init__(self, config, task, texts, names, models):
         self.config, self.task = config, task
-        self.v3 = config.get('response_protocol') == 'reasoning_answer_v3'
+        self.v3 = config.get('response_protocol') in ('reasoning_answer_v3','reasoning_answer_v4')
+        self.v4 = config.get('response_protocol') == 'reasoning_answer_v4'
         self.texts = dict(texts, peer_message=texts['qa_peer_message_v3' if self.v3 else 'qa_peer_message'])
         self.names, self.models = names, models
 
@@ -43,11 +44,13 @@ class QuestionResponsePolicy:
         if self.v3:
             # One update instruction covers peer and no-peer branches, so paired controls match.
             rounds = self.config.get('planned_rounds', self.config['rounds'])
-            turn = (self.texts['qa_turn_forced_v3'].format(rounds=rounds, answer='Yes' if self.config['initialization'][i] == 1 else 'No') if forced else
-                    self.texts['qa_turn_initial_v3'].format(rounds=rounds) if t == 0 else
-                    self.texts['qa_turn_update_v3'].format(round=t, rounds=rounds))
-            closing = self.texts['qa_closing_initial' if t == 0 else 'qa_closing_update'].strip()
-            return self.texts['qa_response_reasoning'].format(turn_instruction=turn.rstrip('\n'), closing=closing)
+            suffix='v4' if self.v4 else 'v3'
+            turn = (self.texts['qa_turn_forced_'+suffix].format(rounds=rounds, answer='Yes' if self.config['initialization'][i] == 1 else 'No') if forced else
+                    self.texts['qa_turn_initial_'+suffix].format(rounds=rounds) if t == 0 else
+                    self.texts['qa_turn_update_'+suffix].format(round=t, rounds=rounds))
+            if self.v4 and self.task.get('dataset')=='proofwriter':turn+='\n'+self.texts['qa_proof_check_v4']
+            closing = self.texts['qa_closing_initial' if t == 0 else 'qa_closing_update_v4' if self.v4 else 'qa_closing_update'].strip()
+            return self.texts['qa_response_reasoning_v4' if self.v4 else 'qa_response_reasoning'].format(turn_instruction=turn.rstrip('\n'), closing=closing)
         if forced:
             answer = 'Yes' if self.config['initialization'][i] == 1 else 'No'
             turn = (f'No peer has spoken yet. Your assigned initial answer is {answer}. '
@@ -83,7 +86,7 @@ class QuestionResponsePolicy:
             exempt=[m['content'] for m in history[:2]]+[prompt]
             result=runtime.generate_reasoning_response(history+[dict(role='user',content=prompt)],
                 self.config['max_argument_tokens'],own,exempt,self.config['copy_block_ngram'],sampling=options.get('sampling'),assigned=assigned,
-                next_choice=t > 0)
+                next_choice=t > 0,**({'clean_next':True} if self.v4 else {}))
             answer,argument,status=result['answer'],result['argument'],'valid'
             generation=result['generation'];generation['instruction']=prompt
             decision_time=result['measurement'];decision=decision_time

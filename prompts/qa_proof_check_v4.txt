@@ -1,0 +1,1 @@
+When a disagreement concerns a supplied fact or rule, check its exact wording and the inference that uses it. Do not treat an explicitly provided rule as an assumption or require its conclusion to be stated separately as a fact.

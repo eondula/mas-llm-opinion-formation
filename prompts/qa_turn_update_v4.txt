@@ -1,0 +1,5 @@
+Round {round} of up to {rounds}.
+Write 2–3 sentences in your own words. Briefly restate a fact or earlier claim only when needed to check a specific point.
+- If a message from another agent appears above: name the agent and address a specific relevant claim, question, or objection. Explain why you accept it, challenge it, or need clarification.
+- If no message from another agent appears above: check the step your answer depends on most and say whether it holds.
+If a disputed step remains checkable using the available information, identify that step and what still needs to be checked. Do not invent a new argument merely to keep talking.

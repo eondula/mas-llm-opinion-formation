@@ -55,7 +55,10 @@ class LiveView:
                     saved = (stamp, [self.compact(dict(task=file.stem,row=row)) for row in record['rows']])
                     state['files'][str(file)] = saved
             state['files'] = {k:v for k,v in state['files'].items() if k in present}
-            events = dict(state['events'])
+            completed={Path(name).stem for name in state['files']}
+            # A completed record is authoritative, including its stopping round.
+            # Old partial attempts in an append-only log must not add ghost rows.
+            events = {k:v for k,v in state['events'].items() if v['task'] not in completed}
             for _, rows in state['files'].values():
                 for item in rows:
                     events[event_key(item)] = item

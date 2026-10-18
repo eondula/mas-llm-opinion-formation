@@ -34,10 +34,10 @@ def environment(config, runtimes):
     exploration = config['mode'] == 'scenario_exploration'
     return dict(schema_version=2, python=platform.python_version(), platform=platform.platform(),
                 packages=packages, models=models,
-                parser=('reasoning-then-answer-v1' if config.get('response_protocol')=='reasoning_answer_v3' else 'application-serialized-answer-v2' if config.get('response_protocol')=='decision_time_v2' else 'binary-answer-json-v1') if config.get('dataset') else 'strict-json-1' if exploration else PARSER_VERSION,
-                scorer='answer-token-logits-after-reasoning-v1' if config.get('response_protocol')=='reasoning_answer_v3' else 'answer-token-logits-v1' if config.get('response_protocol')=='decision_time_v2' else EXPLORATION_SCORER_VERSION if exploration else SCORER_VERSION,
+                parser=('reasoning-then-answer-v2' if config.get('response_protocol')=='reasoning_answer_v4' else 'reasoning-then-answer-v1' if config.get('response_protocol') in ('reasoning_answer_v3','reasoning_answer_v4') else 'application-serialized-answer-v2' if config.get('response_protocol')=='decision_time_v2' else 'binary-answer-json-v1') if config.get('dataset') else 'strict-json-1' if exploration else PARSER_VERSION,
+                scorer='answer-token-logits-after-reasoning-v1' if config.get('response_protocol') in ('reasoning_answer_v3','reasoning_answer_v4') else 'answer-token-logits-v1' if config.get('response_protocol')=='decision_time_v2' else EXPLORATION_SCORER_VERSION if exploration else SCORER_VERSION,
                 auxiliary_probe_scorer=SCORER_VERSION,primary_measurement='decision_time' if config.get('response_protocol') in DECISION_PROTOCOLS else 'post_response_probe',
-                decoding_parameters=dict(EXPLICIT_DECODING,copy_block_ngram=config['copy_block_ngram']) if config.get('response_protocol')=='reasoning_answer_v3' else 'checkpoint_generation_config_defaults',
+                decoding_parameters=dict(EXPLICIT_DECODING,copy_block_ngram=config['copy_block_ngram']) if config.get('response_protocol') in ('reasoning_answer_v3','reasoning_answer_v4') else 'checkpoint_generation_config_defaults',
                 measurement_probe='question-yes-no-v1' if config.get('dataset') else 'historical-configured-probe',
                 decoding=config['decoding'], sampling=config.get('sampling'),
                 seed=config.get('seed', 42), repetitions=config.get('repetitions', 1))

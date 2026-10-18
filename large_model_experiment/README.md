@@ -2,7 +2,7 @@
 
 Same design as `results/experiments/pilot_experiment_2`, with API models as the two agents:
 
-- `reasoning_answer_v3` prompts (option A), loaded from `prompts/`
+- `reasoning_answer_v4` prompts (option A), loaded from `prompts/`
 - 2 agents, up to 5 update rounds: from round 1 each response ends with `Next: continue` or `Next: finish`, and the conversation stops once both agents say finish. The no-peer control runs as many rounds as its matched peer conversation.
 - natural starts
 - compositions CC / OO / CO / OC (C = Claude, O = OpenAI)
@@ -54,3 +54,5 @@ The output layout matches the local runs:
   - OpenAI gets `temperature=0` and `reasoning_effort=none`. If the model rejects either, it is dropped and recorded in `environment.json`.
   - Neither provider guarantees identical output on reruns.
 - **Peer messages:** when a peer message and the turn instruction arrive together, Claude receives them as one user turn with two separate text blocks. The API requires alternating roles. OpenAI receives them as two user messages, as the local models did.
+
+The v4 prompts require checking delivered objections before finishing. Only a terminal Next line after the answer controls API stopping; embedded Next controls are removed from the delivered reasoning and retained in raw output.

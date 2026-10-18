@@ -64,8 +64,8 @@ def resolve(raw, planned=False):
                 or raw.get('argument_source', 'own') != 'own' or raw.get('information_access', 'none') != 'none'):
             raise ValueError('Historical personas, argument probes, joint tasks and exporters are not StrategyQA protocols')
         raw=dict(raw)
-        raw.setdefault('response_protocol','legacy_json' if raw.get('pilot_protocol','').startswith('strategyqa-pilot-v4-') else 'reasoning_answer_v3')
-        if raw['response_protocol']=='reasoning_answer_v3':
+        raw.setdefault('response_protocol','legacy_json' if raw.get('pilot_protocol','').startswith('strategyqa-pilot-v4-') else 'reasoning_answer_v4')
+        if raw['response_protocol'] in ('reasoning_answer_v3','reasoning_answer_v4'):
             # Agents end the conversation with their structured Next: line; rounds is the budget.
             raw.setdefault('copy_block_ngram',0)
             raw.setdefault('stopping','agent_signal')
@@ -73,8 +73,8 @@ def resolve(raw, planned=False):
         raw.setdefault('stopping','fixed')
         if raw['stopping'] not in ('fixed','agent_signal'):
             raise ValueError('Dataset experiments use fixed rounds or agent_signal stopping')
-        if raw['stopping']=='agent_signal' and raw['response_protocol']!='reasoning_answer_v3':
-            raise ValueError('agent_signal stopping requires the reasoning_answer_v3 protocol')
+        if raw['stopping']=='agent_signal' and raw['response_protocol'] not in ('reasoning_answer_v3','reasoning_answer_v4'):
+            raise ValueError('agent_signal stopping requires a reasoning-first protocol')
         raw.setdefault('question_figure_profile','question_png')
         raw.setdefault('max_argument_tokens',512)
         raw = dict(raw, **required, dataset=dataset, tasks=tasks, scenarios=tasks,
@@ -115,13 +115,13 @@ def resolve(raw, planned=False):
     if c.get('output_layout') not in (None, 'experiment'):
         raise ValueError('Unknown output layout')
     if c.get('dataset'):
-        if c.get('response_protocol') not in ('legacy_json','decision_time_v2','reasoning_answer_v3'):raise ValueError('Unknown question response protocol')
+        if c.get('response_protocol') not in ('legacy_json','decision_time_v2','reasoning_answer_v3','reasoning_answer_v4'):raise ValueError('Unknown question response protocol')
         if c.get('question_figure_profile') not in ('question_png','full'):raise ValueError('Unknown question figure profile')
-        if c['response_protocol'] in ('decision_time_v2','reasoning_answer_v3') and c['max_argument_tokens']<2:raise ValueError('Decision-time response budget must be at least two tokens')
-        if c['response_protocol']=='reasoning_answer_v3':
+        if c['response_protocol'] in ('decision_time_v2','reasoning_answer_v3','reasoning_answer_v4') and c['max_argument_tokens']<2:raise ValueError('Decision-time response budget must be at least two tokens')
+        if c['response_protocol'] in ('reasoning_answer_v3','reasoning_answer_v4'):
             n=c.get('copy_block_ngram')
             if type(n) is not int or not (n==0 or 2<=n<=32):raise ValueError('copy_block_ngram must be 0 (off) or an integer from 2 to 32')
-        elif 'copy_block_ngram' in c:raise ValueError('copy_block_ngram applies only to reasoning_answer_v3')
+        elif 'copy_block_ngram' in c:raise ValueError('copy_block_ngram applies only to reasoning-first protocols')
         c.setdefault('message_similarity', True)
         if type(c['message_similarity']) is not bool:
             raise ValueError('message_similarity must be boolean')

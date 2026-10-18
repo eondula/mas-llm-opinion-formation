@@ -1,0 +1,2 @@
+Round 0 of up to {rounds}. No other agent has spoken yet.
+Your assigned initial answer is {answer}. In 2–3 sentences, give the main reason for this starting position. After this round you may keep or change your answer.

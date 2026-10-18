@@ -1,4 +1,4 @@
-"""Claude vs OpenAI agents on the reasoning_answer_v3 protocol: same prompts, questions and paired design.
+"""Claude vs OpenAI agents on the reasoning_answer_v4 protocol: same prompts, questions and paired design.
 
 Run from the project root:
     .venv/bin/python large_model_experiment/run_experiment.py --run-id claude_openai_1
@@ -33,7 +33,7 @@ sys.path.insert(0, str(ROOT))
 
 from llm_mas.config import digest  # noqa: E402
 from llm_mas.datasets import select, labels as dataset_labels  # noqa: E402
-from llm_mas.decision_generation import split_reasoning  # noqa: E402
+from llm_mas.decision_generation import split_reasoning, parse_next_action, strip_next_controls  # noqa: E402
 from llm_mas.engine import names_for  # noqa: E402
 from llm_mas.prompts import templates  # noqa: E402
 from llm_mas.question_policy import QuestionResponsePolicy  # noqa: E402
@@ -43,7 +43,7 @@ import providers  # noqa: E402
 
 QUESTION_IDS = ['7d310e9ebc2025febdd6', 'a905e30e6cfc76377348', 'd692a072dbe7acefbc6b', '315575d5cbdd1d154744']
 DATASET = dict(name='strategyqa', path='data/strategyqa', partition='train', split='train', split_seed=42)
-PROTOCOL = 'reasoning_answer_v3_api'
+PROTOCOL = 'reasoning_answer_v4_api'
 
 
 def load_env(path):
@@ -95,7 +95,7 @@ class Experiment:
             write(self.path/'status.json', dict(phase=phase, completed=self.completed, total=self.total, updated=datetime.now().isoformat(), **extra))
 
     def policy(self, task, models):
-        cfg = dict(response_protocol='reasoning_answer_v3', rounds=self.config['rounds'], initialization='natural',
+        cfg = dict(response_protocol='reasoning_answer_v4', rounds=self.config['rounds'], initialization='natural',
                    paired_control=True, agents=2, schedule='synchronous', decoding='greedy', copy_block_ngram=0)
         return QuestionResponsePolicy(cfg, task, self.texts, names_for(2), models)
 
@@ -104,14 +104,13 @@ class Experiment:
         decision_history = deepcopy(history)
         agent = self.agents[models[i]]
         result = agent.generate(history[0]['content'], history[1:]+[dict(role='user', content=prompt)])
-        parsed = split_reasoning(result['text'])
+        parsed = split_reasoning(result['text'],clean_next=True)
         answer = parsed['stated_answer']
         status = 'refusal' if result['refusal'] else 'valid' if answer else 'no_answer_line'
         reasoning = parsed['reasoning']
         # Rounds 1+: the model states Next: continue/finish after its answer (no logits through the API).
-        found = re.search(r'(?im)^[\s*_>-]*next\s*[*_]*\s*:\s*[*_]*\s*(continue|finish)\b', result['text']) if t > 0 else None
-        next_action = found.group(1).lower() if found else None
-        message = (reasoning+'\n' if reasoning else '')+'Answer: '+answer if status == 'valid' else result['text']
+        next_action = parse_next_action(result['text']) if t > 0 and status=='valid' else None
+        message = (reasoning+'\n' if reasoning else '')+'Answer: '+answer if status == 'valid' else strip_next_controls(result['text'])
         if status == 'valid' and next_action:
             message += '\nNext: '+next_action
         history.append(dict(role='assistant', content=message))
@@ -125,7 +124,8 @@ class Experiment:
                     assigned_initial_answer=None, before=empty, decision=empty, post=empty, message=message, argument=reasoning,
                     generation=dict(result, instruction=prompt, raw_output=result['text'], answer_marker_found=parsed['marker_found'],
                                     answer_before_reasoning=parsed['answer_before_reasoning'], reasoning=reasoning,
-                                    choice_parser_version='stated-answer-line-v1'),
+                                    next_before_answer=parsed['next_before_answer'], next_action=next_action,
+                                    choice_parser_version='stated-answer-line-v2'),
                     next_action=next_action, next_choice=dict(method='stated-next-line-v1', selected_action=next_action) if t > 0 else None,
                     deliveries=deliveries, decision_history=decision_history, history=deepcopy(history))
 
