@@ -55,7 +55,8 @@
                 <option value="no_persona">No persona</option><option value="persona">Persona</option></select></label><p id="persona-help" hidden>Scenario roles alternate by agent: A/C/etc. prioritize Strategy 1’s attribute; B/D/etc. prioritize Strategy 2’s attribute. Roles persist, but choices can change. All settings below remain editable.</p>
 <label>Agents<input id="agents" type="number" min="1" value="2"></label>
 <label>Agent configuration<select id="agent-configuration"><option value="homogeneous">Homogeneous · shared checkpoint</option><option value="heterogeneous">Heterogeneous · choose per agent</option></select></label><label id="shared-model-label">Shared model<select id="shared-model"></select></label><div id="agent-models" hidden></div><p id="model-help"></p><textarea id="models" hidden aria-hidden="true"></textarea>
-<label>Dataset<input value="StrategyQA · question-only" readonly></label>
+<label>Dataset<select id="dataset-name"><option value="strategyqa">StrategyQA</option><option value="boolq">BoolQ</option><option value="proofwriter">ProofWriter</option></select></label>
+<label id="dataset-depths-label" hidden>ProofWriter proof depths<input id="dataset-depths" value="0,1,2,3" placeholder="e.g. 2,3"></label>
 <label>Source partition<select id="dataset-partition"><option value="train">Labeled training pool</option><option value="test">Official test · no public labels</option></select></label>
 <label>Research split<select id="dataset-split"><option value="train">Train</option><option value="validation">Validation</option><option value="test">Held-out test</option><option value="all">All questions</option></select></label>
 <label>Split seed<input id="split-seed" type="number" min="0" value="42"></label>

@@ -1,8 +1,14 @@
-const $=id=>document.getElementById(id);let catalog=[],events=[],lastIndex=0;
+const $=id=>document.getElementById(id);let catalog=[],events=[],lastIndex=0,questionLoad=0;
+const DATASET_LABELS={strategyqa:'StrategyQA',boolq:'BoolQ',proofwriter:'ProofWriter'};
+function datasetSpec(){
+ const name=$('dataset-name')?.value||'strategyqa';
+ const depths=name==='proofwriter'?String($('dataset-depths').value).split(/[\s,]+/).filter(Boolean).map(Number):null;
+ return {name,...(depths?{proof_depths:depths}:{})};
+}
 async function api(path,data){const r=await fetch('/api/'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{});const v=await r.json();if(!r.ok)throw Error(v.error);return v;}
 function config(){
  if($('mode').value==='experiment' && $('dataset-partition'))return {
-  mode:'experiment',dataset:{name:'strategyqa',partition:$('dataset-partition').value,split:$('dataset-split').value,split_seed:Number($('split-seed').value)},
+  mode:'experiment',dataset:{...datasetSpec(),partition:$('dataset-partition').value,split:$('dataset-split').value,split_seed:Number($('split-seed').value)},
   question_ids:[...$('scenarios').selectedOptions].map(o=>o.value),question_count:Number($('question-count').value),question_seed:Number($('question-seed').value),
   models:$('models').value.split('\n').map(s=>s.trim()).filter(Boolean),agents:Number($('agents').value),agent_configuration:$('agent-configuration').value,
   rounds:Number($('rounds').value),repetitions:Number($('repetitions').value),schedule:$('schedule').value,initialization:$('initialization').value==='natural'?'natural':[...$('forced-strategies').querySelectorAll('select')].map(el=>Number(el.value)),
@@ -13,7 +19,10 @@ function config(){
  return {repetitions:Number($('repetitions')?.value||1),seed:Number($('sampling-seed')?.value||42),joint_task_brief:$('mode').value==='joint_task'?$('joint-task-brief').value.trim():undefined,stopping:$('mode').value==='joint_task'?$('joint-stopping').value:undefined,prompt_style:$('prompt-style').value,decision_mode:$('decision-mode').value,sampling_method:$('sampling-method').value,sampling:{temperature:Number($('temperature').value),top_p:Number($('top-p').value),seed:Number($('sampling-seed').value)},decoding:$('mode').value!=='study'?$('decoding').value:'greedy',preview_preset:$('mode').value!=='study'?$('preview-preset').value:undefined,paper_suite:$('mode').value==='study'&&$('paper-suite').checked,run_id:$('run-id').value.trim()||undefined,mode:$('mode').value,agents:Number($('agents').value),agent_configuration:$('agent-configuration').value,models:$('models').value.split('\n').map(s=>s.trim()).filter(Boolean),scenarios:[...$('scenarios').selectedOptions].map(o=>o.value),rounds:Number($('rounds').value),initialization:$('initialization').value==='natural'?'natural':[...$('forced-strategies').querySelectorAll('select')].map(el=>Number(el.value)),schedule:$('schedule').value,argument_mode:$('argument_mode').value,max_argument_tokens:Number($('max_argument_tokens').value),research:['experiment','study'].includes($('mode').value)?[...document.querySelectorAll('[name=research]:checked')].map(x=>x.value):[],conditions:['experiment','study'].includes($('mode').value)&&$('conditions').value.trim()?JSON.parse($('conditions').value):[]};}
 async function load(){
  if($('mode').value==='experiment' && $('dataset-partition')){
-  const result=await api('questions?partition='+$('dataset-partition').value+'&split='+$('dataset-split').value+'&split_seed='+encodeURIComponent($('split-seed').value));
+  const spec=datasetSpec(),ticket=++questionLoad;
+  const result=await api('questions?dataset='+spec.name+(spec.proof_depths?'&proof_depths='+spec.proof_depths.join(','):'')+'&partition='+$('dataset-partition').value+'&split='+$('dataset-split').value+'&split_seed='+encodeURIComponent($('split-seed').value));
+  // A slower earlier request must not overwrite the list for a newer dataset or depth choice.
+  if(ticket!==questionLoad)return;
   catalog=result.questions.map(q=>({path:q.id,data:{kind:'binary_question',id:q.id,title:q.question,question:q.question}}));
   $('scenarios').replaceChildren(...catalog.map(e=>new Option(e.data.question+' · '+e.path,e.path)));
   $('dataset-help').textContent=`${catalog.length} questions in this split. Leave selection empty to sample the configured count. `+(result.labeled?'Labels are used after simulation only.':'Public labels are unavailable; correctness will remain unscored.');
@@ -75,7 +84,7 @@ function updateHeading(){
  const scenario=activeConfig?.scenarios?.[scenarioIndex];
  const settings=activeTasks[conditionIndex]||{...activeConfig,...activeConfig?.conditions?.[conditionIndex]};
  $('title').textContent=scenario?scenarioLabel(scenario):'Scenario details';
- if(settings.dataset){$('description').textContent=`StrategyQA · ${settings.dataset.partition} / ${settings.dataset.split} · ${({synchronous:'Synchronous deliberation',sequential:'Sequential deliberation · forward',reverse_sequential:'Sequential deliberation · reverse',no_peer:'Independent reasoning'}[settings.schedule]||settings.schedule)} · repetition ${(settings.repetition||0)+1}`;return;}
+ if(settings.dataset){$('description').textContent=`${DATASET_LABELS[settings.dataset.name]||'StrategyQA'}${settings.dataset.proof_depths?' · depths '+settings.dataset.proof_depths.join(','):''} · ${settings.dataset.partition} / ${settings.dataset.split} · ${({synchronous:'Synchronous deliberation',sequential:'Sequential deliberation · forward',reverse_sequential:'Sequential deliberation · reverse',no_peer:'Independent reasoning'}[settings.schedule]||settings.schedule)} · repetition ${(settings.repetition||0)+1}`;return;}
  $('description').textContent=[settings.decision_mode==='generated'?'Generated choice':'Scored choice',settings.schedule?.replaceAll('_',' '),settings.initialization==='natural'?'Natural start':settings.initialization?'Forced start':null,settings.argument_mode?({predefined:'Predefined (cyclic)',agent_selected:'Conversational (fixed list)',combined_reasoning:'Combined prompt (flexible reasoning)',combined_fixed:'Combined prompt (fixed list)',generated:'Generated',conversational:'Conversational (generated)'}[settings.argument_mode]||settings.argument_mode)+' arguments':null].filter(Boolean).join(' · ');
 }
 // Shared identity colors for faces, messages, plot traces, and legends.
@@ -235,7 +244,13 @@ function responseFrame(records,index,task,settings){
  const event=records[index];if(!event||event.task!==task)return [];
  if(settings.schedule!=='synchronous')return [event.row];
  const rows=records.slice(0,index+1).filter(e=>e.task===task&&e.row.round===event.row.round).map(e=>e.row);
- return new Set(rows.map(r=>r.agent)).size===settings.agents?rows:[];
+ if(new Set(rows.map(r=>r.agent)).size===settings.agents)return rows;
+ // Round still being generated: keep the last complete round visible instead of blank bubbles.
+ for(let round=event.row.round-1;round>=0;round--){
+  const previous=records.slice(0,index+1).filter(e=>e.task===task&&e.row.round===round).map(e=>e.row);
+  if(new Set(previous.map(r=>r.agent)).size===settings.agents)return previous;
+ }
+ return rows;
 }
 
 function syncModels(){
@@ -365,7 +380,7 @@ function showInfo(title,content) {
 function showScenarioDetails(scenario) {
  if(!scenario)return;
  const content=document.createElement('div');
- if(scenario.kind==='binary_question'){content.textContent=(scenario.question||scenario.title)+'\n\nPossible answers: Yes / No. Question ID: '+scenario.id;showInfo('StrategyQA question',content);return;}
+ if(scenario.kind==='binary_question'){content.textContent=(scenario.question||scenario.title)+'\n\nPossible answers: Yes / No. Question ID: '+scenario.id;showInfo((DATASET_LABELS[scenario.dataset]||'StrategyQA')+' question',content);return;}
  const add=(heading,text)=>{if(!text)return;const h=document.createElement('h3'),p=document.createElement('p');h.textContent=heading;p.textContent=text;content.append(h,p);};
  add('Full description',scenario.title);add('Context',scenario.context);add('Topic',scenario.topic);
  for(const k of [1,2]){const option=scenario[`strategy_${k}`];if(option)add(`Strategy ${k} · ${option.name}`,option.candidate);}
@@ -407,3 +422,10 @@ $('dataset-partition').onchange=()=>{
  safe(load)();
 };
 $('dataset-split').onchange=safe(load);$('split-seed').onchange=safe(load);
+$('dataset-name').onchange=()=>{
+ const proof=$('dataset-name').value==='proofwriter';$('dataset-depths-label').hidden=!proof;
+ $('dataset-partition').querySelector('option[value="test"]').disabled=proof;
+ if(proof&&$('dataset-partition').value!=='train'){$('dataset-partition').value='train';$('dataset-partition').onchange();return;}
+ safe(load)();
+};
+$('dataset-depths').onchange=safe(load);
