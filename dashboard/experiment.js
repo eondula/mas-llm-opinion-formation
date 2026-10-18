@@ -2,7 +2,7 @@ const $=id=>document.getElementById(id);
 let experimentId='',busy=false,followLatest=true,pilotConfig=null,pilotReady=false,pilotRequested=false,pilotMessage='',newSetup=false,submitting=false,viewGeneration=0,pilotLoadId=0;
 function lockPilot(){
  for(const node of $('settings').querySelectorAll('input,select,textarea'))node.disabled=false;
- samplingControls();
+ samplingControls();compositionControls();
  if(pilotConfig)for(const node of $('settings').querySelectorAll('input,select,textarea'))node.disabled=node.id!=='experiment-id';
 }
 function updateControls(){
@@ -35,6 +35,8 @@ $('pilot-preset').onclick=async()=>{
   if(!data.config)throw Error(data.error||'Pilot settings were not returned by the server.');
   pilotConfig=data.config;pilotReady=data.ready===true;pilotMessage=data.message||'Pilot is not ready. Freeze its protocol on this server.';
   $('pilot-device').value=data.config.device;const c=pilotConfig;
+  $('composition-matrix').checked=true;$('model-q').value=c.model_configurations[0][0];$('model-s').value=c.model_configurations[1][0];
+  for(const name of ['qq','ss','qs','sq'])$('composition-'+name).checked=true;
   for(const [id,value] of Object.entries({'runs':c.repetitions,'question-count':c.question_count,'agents':c.agents,'agent-configuration':c.agent_configuration,'rounds':c.rounds,'schedule':c.schedule,'initialization':'natural','partition':'train','split':'train','split-seed':42,'question-seed':42,'question-balance':'equal','decoding':c.decoding,'seed':c.seed,'sampling-method':c.sampling_method,'temperature':c.sampling.temperature,'top-p':c.sampling.top_p,'tokens':c.max_argument_tokens,'device':c.device,'question-ids':c.question_ids.join(', ')}))$(id).value=value;
   $('control').checked=true;$('sentiment').checked=true;$('message-similarity').checked=true;
   starts();modelPicker.render();for(const node of $('agent-models').querySelectorAll('select'))node.value=c.models[0];modelPicker.sync();
@@ -42,16 +44,34 @@ $('pilot-preset').onclick=async()=>{
  }catch(error){if(requestId===pilotLoadId){pilotMessage=error.message;fail(error);}}
  finally{updateControls();}
 };
-$('custom-preset').onclick=()=>{pilotLoadId++;pilotConfig=null;pilotReady=false;pilotRequested=false;pilotMessage='';$('pilot-help').textContent='Custom experiment settings active.';updateControls();};
+$('custom-preset').onclick=()=>{
+ pilotLoadId++;pilotConfig=null;pilotReady=false;pilotRequested=false;pilotMessage='';
+ for(const [id,value] of Object.entries({'runs':3,'question-count':10,'agents':2,'rounds':5,'schedule':'synchronous','initialization':'natural','partition':'train','split-seed':42,'question-seed':42,'question-balance':'equal','decoding':'fixed_sampling','seed':42,'sampling-method':'combined','temperature':0.7,'top-p':0.9,'tokens':512,'question-ids':''}))$(id).value=value;
+ $('split').replaceChildren(...[['train','Train'],['validation','Validation'],['test','Held-out test'],['all','All']].map(([value,label])=>new Option(label,value)));
+ for(const option of $('questions').options)option.selected=false;
+ $('composition-matrix').checked=true;for(const name of ['qq','ss','qs','sq'])$('composition-'+name).checked=true;
+ $('model-q').value=OpinionModelControls.available[0];$('model-s').value=OpinionModelControls.available[2];
+ $('control').checked=true;$('sentiment').checked=true;$('message-similarity').checked=true;starts();
+ $('pilot-help').textContent='Editable pilot setup: QQ / SS / QS / SQ, 10 balanced questions, 3 repetitions, 5 updates, and matched no-peer controls. Change any setting below. This is a custom experiment, without a frozen pilot protocol.';
+ updateControls();loadQuestions().catch(fail);
+};
 async function api(path,data){const response=await fetch('/api/'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{});const body=await response.json();if(!response.ok)throw Error(body.error||'Request failed');return body;}
 function configuration(){
  if(pilotRequested&&!pilotReady)throw Error(pilotMessage||'Load a ready pilot before starting.');
  if(pilotConfig)return {...structuredClone(pilotConfig),run_id:$('experiment-id').value.trim()||undefined};
- const models=$('models').value.split('\n').map(v=>v.trim()).filter(Boolean),agents=Number($('agents').value),schedule=$('schedule').value;
+ let models=$('models').value.split('\n').map(v=>v.trim()).filter(Boolean),agents=Number($('agents').value),schedule=$('schedule').value;
+ let model_configurations,agent_configuration=$('agent-configuration').value;
+ if($('composition-matrix')?.checked){
+  const q=$('model-q').value,s=$('model-s').value;
+  if(q===s)throw Error('Choose different checkpoints for Model Q and Model S.');
+  model_configurations=[['qq',[q,q]],['ss',[s,s]],['qs',[q,s]],['sq',[s,q]]].filter(([name])=>$('composition-'+name).checked).map(([,assignment])=>assignment);
+  if(!model_configurations.length)throw Error('Select at least one agent composition.');
+  models=model_configurations[0];agents=2;agent_configuration='heterogeneous';
+ }
  const explicit=$('question-ids').value.split(/[\s,]+/).filter(Boolean);
  const ids=explicit.length?explicit:[...$('questions').selectedOptions].map(option=>option.value);
  return {mode:'experiment',output_layout:'experiment',run_id:$('experiment-id').value.trim()||undefined,
-  models,agents,agent_configuration:$('agent-configuration').value,rounds:Number($('rounds').value),
+  models,agents,agent_configuration,...(model_configurations?{model_configurations}:{}),rounds:Number($('rounds').value),
   repetitions:Number($('runs').value),question_count:Number($('question-count').value),question_ids:ids,question_seed:Number($('question-seed').value),question_balance:$('question-balance')?.value||'random',
   dataset:{name:'strategyqa',partition:$('partition').value,split:$('split').value,split_seed:Number($('split-seed').value)},
   initialization:$('initialization').value==='natural'?'natural':[...$('forced-answers').querySelectorAll('select')].map(node=>Number(node.value)),
@@ -59,6 +79,12 @@ function configuration(){
   decoding:$('decoding').value,sampling_method:$('sampling-method').value,seed:Number($('seed').value),
   sampling:{temperature:Number($('temperature').value),top_p:Number($('top-p').value),seed:Number($('seed').value)},
   max_argument_tokens:Number($('tokens').value),message_similarity:$('message-similarity').checked,device:$('device').value,sentiment:$('sentiment').checked};
+}
+function compositionControls(){
+ const matrix=$('composition-matrix').checked;
+ $('composition-settings').hidden=!matrix;$('single-model-settings').hidden=matrix;
+ for(const node of $('single-model-settings').querySelectorAll('input,select,textarea'))node.disabled=matrix;
+ if(matrix&&$('agents').value!=='2'){$('agents').value=2;starts();}
 }
 function starts(){const box=$('forced-answers'),old=[...box.querySelectorAll('select')].map(n=>n.value);box.replaceChildren();box.hidden=$('initialization').value!=='forced';for(let i=0;i<Number($('agents').value);i++){const label=document.createElement('label');label.textContent=i<26?'Agent '+String.fromCharCode(65+i):'Agent '+(i+1);const select=document.createElement('select');select.add(new Option('Yes','1'));select.add(new Option('No','2'));select.value=old[i]||(i%2?'2':'1');label.append(select);box.append(label);}}
 const percent=v=>typeof v==='number'?(v*100).toFixed(1)+'%':'—';
@@ -108,6 +134,9 @@ $('stop').onclick=async()=>{try{await api('stop',{run_id:experimentId});$('phase
 $('open').onclick=async()=>{viewGeneration++;newSetup=false;followLatest=false;experimentId=$('saved').value;localStorage.setItem('opinion-experiment',experimentId);$('error').textContent='';try{await poll();}catch(error){fail(error);}};
 $('latest').onclick=async()=>{viewGeneration++;newSetup=false;followLatest=true;experimentId='';$('error').textContent='';try{await poll();await saved();}catch(error){fail(error);}};
 const modelPicker=OpinionModelControls.create();
+for(const id of ['model-q','model-s'])for(const value of OpinionModelControls.available)$(id).add(new Option(value,value));
+$('model-s').value=OpinionModelControls.available[2];
+$('composition-matrix').onchange=compositionControls;compositionControls();
 $('initialization').onchange=starts;$('agents').onchange=()=>{starts();modelPicker.render();};starts();
 async function loadQuestions(){
  const box=$('questions'),selected=new Set([...box.selectedOptions].map(option=>option.value));

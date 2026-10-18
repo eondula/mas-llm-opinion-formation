@@ -280,8 +280,8 @@ def serve(port=8766):
                             from .pilot import assert_lock
                             from .prompts import templates
                             assert_lock(config,templates())
-                        if not config.get('pilot_protocol') and (config.get('grid') or config.get('agent_counts') or config.get('model_configurations')):
-                            raise ValueError('Use explicit experiment settings and optional schedule controls')
+                        if not config.get('pilot_protocol') and (config.get('grid') or config.get('agent_counts')):
+                            raise ValueError('Use explicit agent compositions and optional schedule controls')
                         name=resolve_run_id(config.pop('run_id',None))
                         folder=ROOT/'results/experiments'/name
                         if folder.exists() or run_path(name).exists():

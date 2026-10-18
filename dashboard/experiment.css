@@ -40,3 +40,6 @@
 .experiment-page .experiment-main>section:not(.context){padding:clamp(1rem,2vw,1.5rem)}
 .experiment-page #pilot-help{white-space:pre-wrap}
 @media(max-width:60rem){.experiment-layout{grid-template-columns:minmax(0,1fr)}.experiment-page .setup-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr))}}
+
+.experiment-page #single-model-settings,.experiment-page #composition-settings{display:grid;gap:12px;min-width:0}
+.experiment-page #single-model-settings[hidden],.experiment-page #composition-settings[hidden]{display:none}

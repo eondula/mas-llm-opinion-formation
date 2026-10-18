@@ -209,6 +209,17 @@ def resolve(raw, planned=False):
         raise ValueError('Preview requires one scenario')
     if len(c['models']) not in (1, c['agents']) or not all(isinstance(m, str) and m.strip() for m in c['models']):
         raise ValueError('Supply one model or one checkpoint per agent')
+    assignments = c.get('model_configurations')
+    if assignments:
+        if not isinstance(assignments, list) or any(
+            not isinstance(row, list) or not any(len(row) in (1, n) for n in (c.get('agent_counts') or [c['agents']]))
+            or not all(isinstance(model, str) and model.strip() for model in row)
+            for row in assignments
+        ):
+            raise ValueError('Each model composition requires one checkpoint or one checkpoint per agent')
+        expanded = [tuple(row * c['agents'] if len(row) == 1 else row) for row in assignments]
+        if len(set(expanded)) != len(expanded):
+            raise ValueError('Model compositions must be unique')
     if c.get('agent_configuration') == 'homogeneous' and len(set(c['models'])) != 1:
         raise ValueError('Homogeneous mode requires a shared checkpoint')
     if c.get('agent_configuration') == 'heterogeneous' and len(c['models']) != c['agents']:

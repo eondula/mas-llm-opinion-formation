@@ -8,10 +8,14 @@
 <label>Experiment ID <input id="experiment-id" placeholder="Generated automatically" pattern="[A-Za-z0-9_-]+"></label>
 <label>Number of runs <input id="runs" type="number" value="10" min="1" required></label>
 <label>Questions per run <input id="question-count" type="number" value="5" min="1" required></label>
-<label>Agents <input id="agents" type="number" value="2" min="1" required></label>
+<label class="check"><input id="composition-matrix" type="checkbox" aria-controls="composition-settings single-model-settings"> Run multiple two-agent compositions</label>
+<fieldset id="composition-settings" hidden><legend>Agent compositions</legend><p class="hint">Q and S identify checkpoints. The first letter is Agent A; the second is Agent B. Every selected composition uses the same questions and repetition count.</p>
+<label>Model Q<select id="model-q"></select></label><label>Model S<select id="model-s"></select></label>
+<label class="check"><input id="composition-qq" type="checkbox" checked> QQ · Q / Q</label><label class="check"><input id="composition-ss" type="checkbox" checked> SS · S / S</label><label class="check"><input id="composition-qs" type="checkbox" checked> QS · Q / S</label><label class="check"><input id="composition-sq" type="checkbox" checked> SQ · S / Q</label></fieldset>
+<div id="single-model-settings"><label>Agents <input id="agents" type="number" value="2" min="1" required></label>
 <label>Agent configuration<select id="agent-configuration"><option value="homogeneous">Homogeneous · shared checkpoint</option><option value="heterogeneous">Heterogeneous · choose per agent</option></select></label>
 <label id="shared-model-label">Shared model<select id="shared-model"></select></label><div id="agent-models" hidden></div><p id="model-help"></p><textarea id="models" hidden aria-hidden="true"></textarea>
-<label>Update rounds <input id="rounds" type="number" value="3" min="0" required></label>
+</div><label>Update rounds <input id="rounds" type="number" value="3" min="0" required></label>
 <label>Communication <select id="schedule"><option value="synchronous">Synchronous</option><option value="sequential">Sequential · forward</option><option value="reverse_sequential">Sequential · reverse</option><option value="no_peer">No peer</option></select></label>
 <label>Initial answers <select id="initialization"><option value="natural">Natural</option><option value="forced">Forced · Yes/No per agent</option></select></label>
 <div id="forced-answers" class="grid" hidden></div>
