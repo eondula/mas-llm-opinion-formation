@@ -1,10 +1,51 @@
 const $=id=>document.getElementById(id);
-let experimentId='',busy=false,followLatest=true,pilotConfig=null,pilotReady=false;
-function lockPilot(){if(pilotConfig)for(const node of $('settings').querySelectorAll('input,select,textarea'))node.disabled=node.id!=='experiment-id';}
-$('pilot-preset').onclick=async()=>{try{const data=await api('pilot?device='+encodeURIComponent($('pilot-device').value));pilotConfig=data.config;pilotReady=data.ready!==false;$('pilot-device').value=data.config.device;const c=pilotConfig;for(const [id,value] of Object.entries({'runs':c.repetitions,'question-count':c.question_count,'agents':c.agents,'agent-configuration':c.agent_configuration,'rounds':c.rounds,'schedule':c.schedule,'initialization':'natural','partition':'train','split':'train','split-seed':42,'question-seed':42,'question-balance':'equal','decoding':c.decoding,'seed':c.seed,'sampling-method':c.sampling_method,'temperature':c.sampling.temperature,'top-p':c.sampling.top_p,'tokens':c.max_argument_tokens,'device':c.device,'question-ids':c.question_ids.join(', ')}))$(id).value=value;$('control').checked=true;$('sentiment').checked=true;$('message-similarity').checked=true;starts();modelPicker.render();for(const node of $('agent-models').querySelectorAll('select'))node.value=c.models[0];modelPicker.sync();samplingControls();$('pilot-help').textContent='Pilot '+c.device.toUpperCase()+': 10 training questions (5 Yes / 5 No), QQ / SS / QS / SQ, 3 repetitions, 5 updates, natural starts, synchronous + shared-initialization no-peer. 120 pairs; 240 conversations; 2,640 responses, each with an answer-selection and explanation stage. 512-token budget. Stance audit runs first. '+(pilotReady?'Protocol '+data.protocol_hash:data.message);lockPilot();$('start').disabled=busy||!pilotReady;}catch(error){fail(error);}};
-$('custom-preset').onclick=()=>{pilotConfig=null;pilotReady=false;$('start').disabled=busy;for(const node of $('settings').querySelectorAll('input,select,textarea'))node.disabled=false;samplingControls();$('pilot-help').textContent='Custom experiment settings active.';};
+let experimentId='',busy=false,followLatest=true,pilotConfig=null,pilotReady=false,pilotRequested=false,pilotMessage='',newSetup=false,submitting=false,viewGeneration=0,pilotLoadId=0;
+function lockPilot(){
+ for(const node of $('settings').querySelectorAll('input,select,textarea'))node.disabled=false;
+ samplingControls();
+ if(pilotConfig)for(const node of $('settings').querySelectorAll('input,select,textarea'))node.disabled=node.id!=='experiment-id';
+}
+function updateControls(){
+ const locked=busy||submitting;
+ $('settings').disabled=locked;lockPilot();
+ for(const id of ['pilot-device','pilot-preset','custom-preset'])$(id).disabled=locked;
+ $('new-experiment').disabled=submitting;
+ $('start').disabled=locked||(pilotRequested&&!pilotReady);
+ $('launch-help').textContent=busy?'Another experiment is active. Follow the latest run to inspect or stop it.':submitting?'Starting experiment…':pilotRequested&&!pilotReady?(pilotMessage||'Loading pilot settings…'):pilotConfig?'Pilot ready. Its scientific settings are fixed; you can enter a new Experiment ID.':'Ready for a new experiment. Load the controlled pilot or configure a custom experiment.';
+}
+function newExperiment(){
+ viewGeneration++;pilotLoadId++;newSetup=true;followLatest=false;experimentId='';
+ pilotConfig=null;pilotReady=false;pilotRequested=false;pilotMessage='';
+ $('saved').value='';$('experiment-id').value='';$('error').textContent='';$('run-error').textContent='';
+ $('pilot-help').textContent='Choose Load controlled pilot for the full matrix, or configure a custom experiment.';
+ renderSummary([]);updateControls();renderNewSetup();$('experiment-id').focus();
+}
+function renderNewSetup(){
+ $('phase').textContent=busy?'New experiment setup · another run is active':'New experiment setup';
+ $('progress').max=1;$('progress').value=0;$('timing').textContent='';$('output').textContent='';
+ $('report-link').hidden=true;$('comparison-link').hidden=true;$('run-error').textContent='';$('stop').disabled=true;renderSummary([]);
+}
+$('new-experiment').onclick=newExperiment;
+$('pilot-preset').onclick=async()=>{
+ const requestId=++pilotLoadId;
+ pilotRequested=true;pilotReady=false;pilotConfig=null;pilotMessage='Loading pilot settings…';$('error').textContent='';updateControls();
+ try{
+  const data=await api('pilot?device='+encodeURIComponent($('pilot-device').value));
+  if(requestId!==pilotLoadId)return;
+  if(!data.config)throw Error(data.error||'Pilot settings were not returned by the server.');
+  pilotConfig=data.config;pilotReady=data.ready===true;pilotMessage=data.message||'Pilot is not ready. Freeze its protocol on this server.';
+  $('pilot-device').value=data.config.device;const c=pilotConfig;
+  for(const [id,value] of Object.entries({'runs':c.repetitions,'question-count':c.question_count,'agents':c.agents,'agent-configuration':c.agent_configuration,'rounds':c.rounds,'schedule':c.schedule,'initialization':'natural','partition':'train','split':'train','split-seed':42,'question-seed':42,'question-balance':'equal','decoding':c.decoding,'seed':c.seed,'sampling-method':c.sampling_method,'temperature':c.sampling.temperature,'top-p':c.sampling.top_p,'tokens':c.max_argument_tokens,'device':c.device,'question-ids':c.question_ids.join(', ')}))$(id).value=value;
+  $('control').checked=true;$('sentiment').checked=true;$('message-similarity').checked=true;
+  starts();modelPicker.render();for(const node of $('agent-models').querySelectorAll('select'))node.value=c.models[0];modelPicker.sync();
+  $('pilot-help').textContent='Pilot '+c.device.toUpperCase()+': 10 balanced questions, QQ / SS / QS / SQ, 3 repetitions, 5 updates, natural starts, synchronous + shared-initialization no-peer. 120 pairs; 240 conversations; 2,640 responses with answer-selection and explanation stages. 512-token budget. '+(pilotReady?'Protocol '+data.protocol_hash:pilotMessage);
+ }catch(error){if(requestId===pilotLoadId){pilotMessage=error.message;fail(error);}}
+ finally{updateControls();}
+};
+$('custom-preset').onclick=()=>{pilotLoadId++;pilotConfig=null;pilotReady=false;pilotRequested=false;pilotMessage='';$('pilot-help').textContent='Custom experiment settings active.';updateControls();};
 async function api(path,data){const response=await fetch('/api/'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{});const body=await response.json();if(!response.ok)throw Error(body.error||'Request failed');return body;}
 function configuration(){
+ if(pilotRequested&&!pilotReady)throw Error(pilotMessage||'Load a ready pilot before starting.');
  if(pilotConfig)return {...structuredClone(pilotConfig),run_id:$('experiment-id').value.trim()||undefined};
  const models=$('models').value.split('\n').map(v=>v.trim()).filter(Boolean),agents=Number($('agents').value),schedule=$('schedule').value;
  const explicit=$('question-ids').value.split(/[\s,]+/).filter(Boolean);
@@ -24,13 +65,48 @@ const percent=v=>typeof v==='number'?(v*100).toFixed(1)+'%':'—';
 const decimal=v=>typeof v==='number'?v.toFixed(4):'—';
 function renderSummary(rows){$('summary-section').hidden=!rows?.length;const body=$('summary').querySelector('tbody');body.replaceChildren();for(const row of rows||[]){const tr=document.createElement('tr');const cells=[row.models,row.agents,row.schedule,row.initialization==='"natural"'?'Natural':row.initialization,row.research_split,row.runs,row.questions,row.conversations,percent(row.initial_accuracy),percent(row.final_accuracy),percent(row.initial_disagreement_rate),percent(row.final_consensus_rate),percent(row.final_majority_accuracy),decimal(row.mean_absolute_stance_change),row.answer_reversals,row.correct_to_incorrect,row.incorrect_to_correct,decimal(row.mean_final_dispersion),decimal(row.mean_adjacent_message_cosine),row.invalid_responses];for(const value of cells){const td=document.createElement('td');td.textContent=value??'—';tr.append(td);}body.append(tr);}}
 async function saved(){const rows=await api('experiments');const select=$('saved'),previous=select.value;select.replaceChildren(new Option('Select an experiment',''),...rows.map(r=>new Option(r.id+' · '+r.phase,r.id)));select.value=experimentId||previous;}
-async function poll(){const data=await api('experiment'+(!followLatest&&experimentId?'?run_id='+encodeURIComponent(experimentId):''));if((followLatest||!experimentId)&&data.run_id)experimentId=data.run_id;if(followLatest&&experimentId)$('saved').value=experimentId;const status=data.status;busy=data.worker_busy;$('settings').disabled=busy;lockPilot();$('pilot-device').disabled=busy;$('pilot-preset').disabled=busy;$('custom-preset').disabled=busy;$('start').disabled=busy||Boolean(pilotConfig&&!pilotReady);$('stop').disabled=!data.can_stop;const completed=status.completed||0,total=status.total||0;$('phase').textContent=(data.run_id?data.run_id+' · ':'')+status.phase.replaceAll('_',' ')+(total?' · '+completed+' / '+total+' responses':'');if(data.remote_progress)$('phase').textContent+=' · last saved progress from '+data.worker_host+' (open the dashboard there for live control)';const phaseTotal=status.phase_total,phaseDone=status.phase_completed||0;if(phaseTotal&&status.phase!=='conversation'&&status.phase!=='complete')$('phase').textContent+=' · phase '+phaseDone+' / '+phaseTotal;$('progress').max=(status.phase!=='conversation'&&status.phase!=='complete'&&phaseTotal)||total||1;$('progress').value=status.phase==='complete'?total||1:(status.phase!=='conversation'&&phaseTotal?phaseDone:completed);$('timing').textContent=status.elapsed_seconds!=null?'Elapsed '+Math.round(status.elapsed_seconds)+'s'+(data.running&&status.estimated_remaining_seconds!=null?' · estimated simulation time remaining '+Math.round(status.estimated_remaining_seconds)+'s':''):'';if(status.generation_total)$('timing').textContent+=' · generated '+(status.generated_responses||0)+' / '+status.generation_total; $('output').textContent=data.output_directory?'Results: '+data.output_directory:'';$('report-link').hidden=!data.report_available;$('report-link').href='/results/'+encodeURIComponent(data.run_id||'')+'/index.html';$('comparison-link').hidden=!data.report_available;if(status.error)$('error').textContent=status.error;renderSummary(status.phase==='complete'?data.summary:[]);if(status.phase==='complete'||status.phase==='failed'||status.phase==='cancelled')await saved();}
+async function poll(){
+ const generation=viewGeneration;
+ const data=await api('experiment'+(!newSetup&&!followLatest&&experimentId?'?run_id='+encodeURIComponent(experimentId):''));
+ if(generation!==viewGeneration)return;
+ busy=Boolean(data.worker_busy);updateControls();
+ if(newSetup){renderNewSetup();return;}
+ if((followLatest||!experimentId)&&data.run_id)experimentId=data.run_id;
+ if(followLatest&&experimentId)$('saved').value=experimentId;
+ const status=data.status;$('stop').disabled=!data.can_stop;
+ const completed=status.completed||0,total=status.total||0;
+ $('phase').textContent=(data.run_id?data.run_id+' · ':'')+status.phase.replaceAll('_',' ')+(total?' · '+completed+' / '+total+' responses':'');
+ if(data.remote_progress)$('phase').textContent+=' · last saved progress from '+data.worker_host+' (open the dashboard there for live control)';
+ const phaseTotal=status.phase_total,phaseDone=status.phase_completed||0;
+ if(phaseTotal&&status.phase!=='conversation'&&status.phase!=='complete')$('phase').textContent+=' · phase '+phaseDone+' / '+phaseTotal;
+ $('progress').max=(status.phase!=='conversation'&&status.phase!=='complete'&&phaseTotal)||total||1;
+ $('progress').value=status.phase==='complete'?total||1:(status.phase!=='conversation'&&phaseTotal?phaseDone:completed);
+ $('timing').textContent=status.elapsed_seconds!=null?'Elapsed '+Math.round(status.elapsed_seconds)+'s'+(data.running&&status.estimated_remaining_seconds!=null?' · estimated simulation time remaining '+Math.round(status.estimated_remaining_seconds)+'s':''):'';
+ if(status.generation_total)$('timing').textContent+=' · generated '+(status.generated_responses||0)+' / '+status.generation_total;
+ $('output').textContent=data.output_directory?'Results: '+data.output_directory:'';
+ $('report-link').hidden=!data.report_available;$('report-link').href='/results/'+encodeURIComponent(data.run_id||'')+'/index.html';$('comparison-link').hidden=!data.report_available;
+ $('run-error').textContent=status.error?'Saved run '+(data.run_id||'')+': '+status.error+' Use New experiment to set up a fresh run.':'';
+ renderSummary(status.phase==='complete'?data.summary:[]);
+ if(['complete','failed','cancelled'].includes(status.phase))await saved();
+}
 function fail(error){$('error').textContent=error.message;}
 $('pilot-device').onchange=()=>$('pilot-preset').click();
-$('configuration').onsubmit=async event=>{event.preventDefault();$('error').textContent='';if(pilotConfig&&!pilotReady){fail(Error('Freeze this device protocol on the server before starting.'));return;}$('start').disabled=true;renderSummary([]);try{const result=await api('experiment',configuration());experimentId=result.run_id;followLatest=true;localStorage.setItem('opinion-experiment',experimentId);$('phase').textContent='Starting '+experimentId;await saved();await poll();}catch(error){$('start').disabled=busy||Boolean(pilotConfig&&!pilotReady);fail(error);}};
+$('configuration').onsubmit=async event=>{
+ event.preventDefault();$('error').textContent='';
+ if(busy||submitting)return;
+ if(pilotRequested&&!pilotReady){fail(Error(pilotMessage||'Freeze this device protocol on the server before starting.'));return;}
+ submitting=true;updateControls();renderSummary([]);
+ try{
+  const result=await api('experiment',configuration());
+  viewGeneration++;experimentId=result.run_id;newSetup=false;followLatest=true;$('run-error').textContent='';
+  localStorage.setItem('opinion-experiment',experimentId);$('phase').textContent='Starting '+experimentId;
+  await saved();await poll();
+ }catch(error){fail(error);}
+ finally{submitting=false;updateControls();}
+};
 $('stop').onclick=async()=>{try{await api('stop',{run_id:experimentId});$('phase').textContent='Stopping…';}catch(error){fail(error);}};
-$('open').onclick=async()=>{followLatest=false;experimentId=$('saved').value;localStorage.setItem('opinion-experiment',experimentId);$('error').textContent='';try{await poll();}catch(error){fail(error);}};
-$('latest').onclick=async()=>{followLatest=true;experimentId='';$('error').textContent='';try{await poll();await saved();}catch(error){fail(error);}};
+$('open').onclick=async()=>{viewGeneration++;newSetup=false;followLatest=false;experimentId=$('saved').value;localStorage.setItem('opinion-experiment',experimentId);$('error').textContent='';try{await poll();}catch(error){fail(error);}};
+$('latest').onclick=async()=>{viewGeneration++;newSetup=false;followLatest=true;experimentId='';$('error').textContent='';try{await poll();await saved();}catch(error){fail(error);}};
 const modelPicker=OpinionModelControls.create();
 $('initialization').onchange=starts;$('agents').onchange=()=>{starts();modelPicker.render();};starts();
 async function loadQuestions(){
